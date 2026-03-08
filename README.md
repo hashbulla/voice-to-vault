@@ -120,6 +120,7 @@ Hetzner cron (TZ=Europe/Paris)
 | Sync | Obsidian Git (community plugin) | Desktop + mobile vault sync | No monthly fee; works on both iOS and Android via HTTPS PAT; survives offline periods with merge-on-reconnect |
 | VPS | Hetzner CX22 (€3.79/mo) | Always-on pipeline host | Cheapest EU VPS with sufficient RAM for Docker + OpenClaw; Koyeb/Fly.io free tiers don't support persistent SSH key mounts needed for vault write operations |
 | TLS | Caddy | HTTPS termination for Telegram webhook | Automatic Let's Encrypt; zero configuration vs. nginx + certbot cron |
+| Secrets management | chmod 400 + scoped Deploy Key | Principle of least privilege — key is write-only to one private repo, 400 permissions, never logged or echoed |
 | Agent runtime | Claude Code (`claude --dangerously-skip-permissions`) | Nightly vault organisation | Headless file manipulation with language understanding; no custom script can match the vault-aware routing logic in AGENT_PROMPT.md |
 | Note format | Obsidian markdown + YAML frontmatter | Structured knowledge storage | Queryable via Dataview; compatible with any future markdown pipeline |
 

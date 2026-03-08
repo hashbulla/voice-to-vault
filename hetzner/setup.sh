@@ -92,7 +92,7 @@ cp "${SSHD_CONFIG}" "${SSHD_CONFIG}.bak.$(date +%Y%m%d%H%M%S)"
 cat >> "${SSHD_CONFIG}" << 'EOF'
 
 # voice-to-vault hardening additions
-PasswordAuthentication no
+ PasswordAuthentication no
 ChallengeResponseAuthentication no
 PermitRootLogin prohibit-password
 MaxAuthTries 3
@@ -131,6 +131,12 @@ apt-get install -y -qq \
 
 systemctl enable docker
 systemctl start docker
+
+# FIX C: Create non-root user for container workloads (uid/gid 1000)
+useradd -r -u 1000 -g 1000 -s /sbin/nologin openclaw 2>/dev/null || true
+mkdir -p /opt/voice-to-vault/vault-clone
+chown 1000:1000 /opt/voice-to-vault/vault-clone
+log_info "✓ Container user openclaw (uid 1000) created"
 
 docker --version
 docker compose version
@@ -173,6 +179,15 @@ log_warn "  cp ${DEPLOY_DIR}/.env.template ${DEPLOY_DIR}/.env"
 log_warn "  vim ${DEPLOY_DIR}/.env"
 log_warn ""
 
+# Copy .env template and harden permissions immediately
+if [ ! -f "${DEPLOY_DIR}/.env" ]; then
+    cp "${DEPLOY_DIR}/.env.template" "${DEPLOY_DIR}/.env"
+    # FIX D: Restrict .env — API keys must never be world-readable
+    chmod 600 "${DEPLOY_DIR}/.env"
+    chown root:root "${DEPLOY_DIR}/.env"
+    log_info "✓ .env created with secure permissions (600)"
+fi
+
 ## ── Step 8: Install vault deploy key ─────────────────────────────────────────
 log_info "Step 8/9: Installing vault Deploy Key..."
 mkdir -p /root/.ssh
@@ -180,7 +195,8 @@ chmod 700 /root/.ssh
 
 if [ -n "${VAULT_DEPLOY_KEY_PRIVATE:-}" ]; then
     echo "${VAULT_DEPLOY_KEY_PRIVATE}" > "${DEPLOY_KEY_PATH}"
-    chmod 600 "${DEPLOY_KEY_PATH}"
+    # FIX A: Deploy key must be 400 (read-only by owner) — not 600
+    chmod 400 "${DEPLOY_KEY_PATH}"
     log_info "✓ Deploy key written from environment variable"
 else
     log_warn "VAULT_DEPLOY_KEY_PRIVATE not set."
@@ -188,6 +204,15 @@ else
     log_warn "  ssh-keygen -t ed25519 -C 'voice-to-vault-deploy-key' -f ${DEPLOY_KEY_PATH} -N ''"
     log_warn "Then add the PUBLIC key to your vault GitHub repo → Settings → Deploy Keys (WRITE access)."
     log_warn "Set VAULT_DEPLOY_KEY_PATH=${DEPLOY_KEY_PATH} in ${DEPLOY_DIR}/.env"
+fi
+
+# FIX A: Harden .ssh directory and key files
+chmod 700 /root/.ssh
+if [ -f "${DEPLOY_KEY_PATH}" ]; then
+    chmod 400 "${DEPLOY_KEY_PATH}"
+fi
+if [ -f "${DEPLOY_KEY_PATH}.pub" ]; then
+    chmod 400 "${DEPLOY_KEY_PATH}.pub"
 fi
 
 # Add GitHub to known hosts to prevent first-connect prompts
@@ -206,6 +231,22 @@ CRON_JOB="0 23 * * * TZ=Europe/Paris ${DEPLOY_DIR}/agents/nightly_processor/run.
 crontab -l | grep nightly_processor
 
 log_info "✓ Cron job registered: nightly at 23:00 CET"
+
+## ── Security verification ─────────────────────────────────────────────────────
+echo ""
+echo "--- Security verification ---"
+
+stat -c "%a %n" "${DEPLOY_KEY_PATH}" 2>/dev/null | \
+    grep -q "^400" \
+    && echo "✅ Deploy key permissions OK (400)" \
+    || echo "❌ FAIL: Deploy key permissions incorrect (expected 400)"
+
+stat -c "%a %n" "${DEPLOY_DIR}/.env" 2>/dev/null | \
+    grep -q "^600" \
+    && echo "✅ .env permissions OK (600)" \
+    || echo "❌ FAIL: .env permissions incorrect (expected 600)"
+
+echo ""
 
 ## ── Summary ───────────────────────────────────────────────────────────────────
 echo ""

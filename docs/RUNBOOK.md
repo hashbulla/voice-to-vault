@@ -196,7 +196,7 @@ vim /opt/voice-to-vault/.env   # update VAULT_DEPLOY_KEY_PATH
 # 4. Rename key
 mv /root/.ssh/vault_deploy_key /root/.ssh/vault_deploy_key_old
 mv /root/.ssh/vault_deploy_key_new /root/.ssh/vault_deploy_key
-chmod 600 /root/.ssh/vault_deploy_key
+chmod 400 /root/.ssh/vault_deploy_key
 
 # 5. Restart
 make restart
@@ -207,6 +207,51 @@ GIT_SSH_COMMAND="ssh -i /root/.ssh/vault_deploy_key -o StrictHostKeyChecking=no"
 
 # 7. Remove old key from GitHub after confirming new key works
 ```
+
+---
+
+## Deploy Key Rotation
+
+Formal procedure for rotating the vault SSH Deploy Key (e.g. after suspected exposure):
+
+1. **Generate new key pair** on the VPS:
+   ```bash
+   ssh-keygen -t ed25519 -C "voice-to-vault-deploy-key-$(date +%Y%m%d)" \
+     -f /root/.ssh/vault_deploy_key_new -N ""
+   chmod 400 /root/.ssh/vault_deploy_key_new
+   ```
+
+2. **Add new public key to GitHub Deploy Keys** (write access):
+   ```bash
+   cat /root/.ssh/vault_deploy_key_new.pub
+   # → https://github.com/hashbulla/second-brain-vault/settings/keys
+   # → Add deploy key → Allow write access → Save
+   ```
+
+3. **Update `VAULT_DEPLOY_KEY_PATH` in `.env`**:
+   ```bash
+   vim /opt/voice-to-vault/.env
+   # Set: VAULT_DEPLOY_KEY_PATH=/root/.ssh/vault_deploy_key_new
+   ```
+
+4. **Restart services to pick up the new key**:
+   ```bash
+   make restart
+   ```
+
+5. **Verify pipeline with smoke test**:
+   ```bash
+   make smoke-test
+   # Send a test voice message — confirm ACK and vault commit appear
+   ```
+
+6. **Remove old key from GitHub Deploy Keys** once new key is confirmed working:
+   - Go to: `https://github.com/hashbulla/second-brain-vault/settings/keys`
+   - Find the old key by its creation date or title
+   - Click **Delete** → confirm
+
+> **Key permissions:** Deploy keys must always be `chmod 400` (read-only by owner).
+> Never `600` or `644`. Verify: `stat -c "%a" /root/.ssh/vault_deploy_key` → must output `400`.
 
 ---
 

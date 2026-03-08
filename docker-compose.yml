@@ -16,6 +16,17 @@ services:
     image: ghcr.io/openclaw/openclaw:latest
     container_name: voice-to-vault-openclaw
     restart: unless-stopped
+    ## FIX C: Run as non-root uid 1000 — attacker cannot escalate to VPS root
+    ## even if a code-injection via Telegram caption/Whisper output succeeds.
+    user: "1000:1000"
+    ## FIX C: Drop ALL Linux capabilities — vault-writer needs no special syscalls.
+    cap_drop:
+      - ALL
+    ## FIX C: Read-only root filesystem — limits post-exploitation persistence.
+    read_only: true
+    ## FIX C: Writable /tmp via tmpfs — in-memory only, cleared on restart.
+    tmpfs:
+      - /tmp
     ports:
       - "127.0.0.1:8080:8080"   # bind to localhost only — Caddy/nginx proxies HTTPS
     volumes:
@@ -24,9 +35,9 @@ services:
       ## SQLite persistence for deduplication and audit
       - openclaw-data:/data
       ## SSH deploy key for vault push (read-only)
-      - ${VAULT_DEPLOY_KEY_PATH}:/root/.ssh/vault_deploy_key:ro
-      ## Vault clone cache (reused across invocations for performance)
-      - vault-clone:/tmp/vault-clone
+      - ${VAULT_DEPLOY_KEY_PATH}:/home/openclaw/.ssh/vault_deploy_key:ro
+      ## FIX C: Vault clone cache — named volume owned by uid 1000:1000
+      - vault_clone:/home/openclaw/vault:rw
     environment:
       ## Telegram
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -40,9 +51,9 @@ services:
       CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5}
       ## GitHub vault repo
       VAULT_REPO: ${VAULT_REPO}
-      VAULT_DEPLOY_KEY_PATH: /root/.ssh/vault_deploy_key
+      VAULT_DEPLOY_KEY_PATH: /home/openclaw/.ssh/vault_deploy_key
       VAULT_BRANCH: ${VAULT_BRANCH:-main}
-      VAULT_CLONE_DIR: /tmp/vault-clone
+      VAULT_CLONE_DIR: /home/openclaw/vault
       ## OpenClaw
       OPENCLAW_PORT: ${OPENCLAW_PORT:-8080}
       OPENCLAW_WEBHOOK_SECRET: ${OPENCLAW_WEBHOOK_SECRET}
@@ -75,6 +86,9 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"   # HTTP/3
+      ## FIX E: Port 2019 (Caddy admin API) is intentionally NOT published.
+      ## admin off is set in Caddyfile — no internal listener exists.
+      ## Omitting 2019 here is defence-in-depth against misconfiguration.
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -93,8 +107,14 @@ services:
 volumes:
   openclaw-data:
     name: voice-to-vault-openclaw-data
-  vault-clone:
-    name: voice-to-vault-vault-clone
+  ## FIX C: Named volume for vault clone — bound to host path owned by uid 1000:1000.
+  ## Provisioned by hetzner/setup.sh: mkdir -p + chown 1000:1000.
+  vault_clone:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind,uid=1000,gid=1000
+      device: /opt/voice-to-vault/vault-clone
   caddy-data:
     name: voice-to-vault-caddy-data
   caddy-config:

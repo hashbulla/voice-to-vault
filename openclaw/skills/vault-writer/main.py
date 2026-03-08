@@ -17,6 +17,7 @@ Implements the full 10-step pipeline:
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 import sys
@@ -42,6 +43,18 @@ logging.basicConfig(
     stream=sys.stderr,
 )
 logger = logging.getLogger("vault-writer")
+
+# FIX B: Fail loud at startup — never run without the webhook secret guard.
+_WEBHOOK_SECRET = os.environ.get("OPENCLAW_WEBHOOK_SECRET")
+if not _WEBHOOK_SECRET:
+    raise RuntimeError(
+        "OPENCLAW_WEBHOOK_SECRET is not set. "
+        "Generate with: openssl rand -hex 32 "
+        "and register with: make register-webhook"
+    )
+
+# FIX C: Caption whitelist — allow only known override tokens, discard everything else.
+_ALLOWED_CAPTIONS = {"!en", "!fr", ""}
 
 
 def _count_words(text: str) -> int:
@@ -98,7 +111,14 @@ def run(event: dict) -> dict:
     chat_id = message.get("chat", {}).get("id")
     sender_id = str(message.get("from", {}).get("id", ""))
     voice = message.get("voice", {})
-    caption = (message.get("caption") or "").strip()
+
+    # FIX C: Sanitise caption — whitelist-only, discard unknown override tokens.
+    raw_caption = (message.get("caption") or "").strip()
+    if raw_caption not in _ALLOWED_CAPTIONS:
+        logger.debug("Discarding unknown caption token: %r", raw_caption)
+        caption = ""
+    else:
+        caption = raw_caption
 
     if not chat_id:
         raise ValueError("Event missing message.chat.id")
@@ -243,10 +263,26 @@ def run(event: dict) -> dict:
 
 def handle(event: dict) -> dict:
     """
-    OpenClaw skill handler. Wraps run() with top-level exception guard.
+    OpenClaw skill handler. Validates webhook secret, then wraps run() with
+    top-level exception guard.
 
-    Any unhandled exception here is a bug — logged with full traceback.
+    FIX B: Secret validation is the FIRST operation — before any processing.
+    Uses hmac.compare_digest() to prevent timing attacks.
     """
+    # ── FIX B: Webhook secret validation ─────────────────────────────────────
+    headers = event.get("headers", {})
+    # Case-insensitive header lookup — Telegram sends X-Telegram-Bot-Api-Secret-Token
+    received_secret = next(
+        (v for k, v in headers.items()
+         if k.lower() == "x-telegram-bot-api-secret-token"),
+        "",
+    )
+    if not hmac.compare_digest(_WEBHOOK_SECRET, received_secret):
+        logger.warning(
+            "Webhook secret mismatch — token=%.4s…[redacted]", received_secret
+        )
+        return {"status": "rejected", "reason": "invalid_secret"}
+
     try:
         return run(event)
     except Exception as exc:
