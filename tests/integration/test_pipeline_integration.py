@@ -26,14 +26,16 @@ TRANSCRIPT_TEXT = (
     "Il faut penser à la rotation automatique des secrets."
 )
 
-CLASSIFICATION_JSON = json.dumps({
-    "domain": "Engineering",
-    "projects": [],
-    "tags": ["kubernetes", "operator", "devsecops"],
-    "summary": "Design d'un opérateur Kubernetes pour External Secrets sur RKE2.",
-    "needs_review": False,
-    "title_slug": "kubernetes-operator-design",
-})
+CLASSIFICATION_JSON = json.dumps(
+    {
+        "domain": "Engineering",
+        "projects": [],
+        "tags": ["kubernetes", "operator", "devsecops"],
+        "summary": "Design d'un opérateur Kubernetes pour External Secrets sur RKE2.",
+        "needs_review": False,
+        "title_slug": "kubernetes-operator-design",
+    }
+)
 
 
 @pytest.fixture
@@ -47,27 +49,43 @@ def git_vault(tmp_path):
     bare.mkdir()
     subprocess.run(
         ["git", "init", "--bare", "-b", "main", str(bare)],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
 
     # Clone it as the vault
     clone = tmp_path / "vault_clone"
     subprocess.run(
         ["git", "clone", str(bare), str(clone)],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
 
     # Configure identity in clone
-    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=str(clone), check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.name", "Test"], cwd=str(clone), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=str(clone),
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=str(clone),
+        check=True,
+        capture_output=True,
+    )
 
     # Create initial commit so branch exists
     (clone / "README.md").write_text("vault")
     subprocess.run(["git", "add", "."], cwd=str(clone), check=True, capture_output=True)
-    subprocess.run(["git", "commit", "-m", "init"], cwd=str(clone), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"], cwd=str(clone), check=True, capture_output=True
+    )
     subprocess.run(
         ["git", "push", "-u", "origin", "main"],
-        cwd=str(clone), check=True, capture_output=True,
+        cwd=str(clone),
+        check=True,
+        capture_output=True,
     )
 
     return {"bare": bare, "clone": clone}
@@ -113,8 +131,14 @@ def test_full_pipeline_engineering_note(env_setup, git_vault, monkeypatch):
     Full pipeline integration test: mock all network calls, use real git.
     """
     for mod in list(sys.modules.keys()):
-        if mod in ("main", "classifier", "git_writer", "note_formatter",
-                   "telegram_ack", "transcriber"):
+        if mod in (
+            "main",
+            "classifier",
+            "git_writer",
+            "note_formatter",
+            "telegram_ack",
+            "transcriber",
+        ):
             sys.modules.pop(mod, None)
 
     import main
@@ -153,18 +177,21 @@ def test_full_pipeline_engineering_note(env_setup, git_vault, monkeypatch):
             # Actually push to local bare remote
             subprocess.run(cmd, cwd=str(cwd), check=True, capture_output=True)
             return ""
-        result = subprocess.run(cmd, cwd=str(cwd) if cwd else None, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, cwd=str(cwd) if cwd else None, capture_output=True, text=True
+        )
         if result.returncode != 0:
             raise RuntimeError(result.stderr)
         return result.stdout.strip()
 
-    with patch("transcriber.openai.OpenAI", return_value=mock_openai_client), \
-         patch("classifier.anthropic.Anthropic", return_value=mock_anthropic_client), \
-         patch.object(main, "get_telegram_file_path", side_effect=fake_get_file), \
-         patch.object(main, "download_telegram_audio", side_effect=fake_download), \
-         patch("telegram_ack._send_telegram_message", side_effect=fake_send_message), \
-         patch.object(git_writer, "_run", side_effect=fake_git_push):
-
+    with (
+        patch("transcriber.openai.OpenAI", return_value=mock_openai_client),
+        patch("classifier.anthropic.Anthropic", return_value=mock_anthropic_client),
+        patch.object(main, "get_telegram_file_path", side_effect=fake_get_file),
+        patch.object(main, "download_telegram_audio", side_effect=fake_download),
+        patch("telegram_ack._send_telegram_message", side_effect=fake_send_message),
+        patch.object(git_writer, "_run", side_effect=fake_git_push),
+    ):
         result = main.handle(_make_event())
 
     # ── Assert pipeline result ──────────────────────────────────────────────────
@@ -176,6 +203,7 @@ def test_full_pipeline_engineering_note(env_setup, git_vault, monkeypatch):
 
     # ── Assert file exists on disk ─────────────────────────────────────────────
     from datetime import datetime, timezone
+
     today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     expected_filename = f"{today}-kubernetes-operator-design.md"
     expected_path = git_vault["clone"] / "00_Inbox" / expected_filename
@@ -208,7 +236,8 @@ def test_full_pipeline_engineering_note(env_setup, git_vault, monkeypatch):
     log_result = subprocess.run(
         ["git", "log", "--oneline"],
         cwd=str(git_vault["clone"]),
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     commits = log_result.stdout.strip().split("\n")
     assert len(commits) >= 2  # init + our commit

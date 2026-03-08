@@ -82,7 +82,9 @@ def _parse_classifier_response(raw: str, lang: str) -> ClassificationResult:
     try:
         data = json.loads(clean)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"Classifier returned non-JSON: {exc}\nRaw: {raw[:500]}") from exc
+        raise ValueError(
+            f"Classifier returned non-JSON: {exc}\nRaw: {raw[:500]}"
+        ) from exc
 
     # Validate required fields
     for key in ("domain", "projects", "tags", "summary", "needs_review", "title_slug"):
@@ -92,7 +94,8 @@ def _parse_classifier_response(raw: str, lang: str) -> ClassificationResult:
     domain = str(data["domain"]).strip()
     if domain not in VALID_DOMAINS:
         logger.warning(
-            "Classifier returned invalid domain '%s', defaulting to 'Engineering'", domain
+            "Classifier returned invalid domain '%s', defaulting to 'Engineering'",
+            domain,
         )
         domain = "Engineering"
 
@@ -128,11 +131,11 @@ def classify_transcript(transcript: str, lang: str) -> ClassificationResult:
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     model = os.environ.get("CLAUDE_MODEL", "claude-haiku-4-5")
 
-    user_message = (
-        f"Language: {lang}\n\nTranscript:\n{transcript}"
-    )
+    user_message = f"Language: {lang}\n\nTranscript:\n{transcript}"
 
-    logger.info("Sending transcript to %s for classification (%d chars)", model, len(transcript))
+    logger.info(
+        "Sending transcript to %s for classification (%d chars)", model, len(transcript)
+    )
 
     message = client.messages.create(
         model=model,

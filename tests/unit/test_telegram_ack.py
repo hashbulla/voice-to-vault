@@ -39,6 +39,7 @@ def _setup_httpx_mock(mocker, response=None):
 
 # ── Security: HTML injection tests ────────────────────────────────────────────
 
+
 class TestHtmlEscaping:
     def _get_post_body(self, mocker, **kwargs) -> str:
         mock_client = _setup_httpx_mock(mocker)
@@ -55,7 +56,11 @@ class TestHtmlEscaping:
             timestamp=ts,
         )
         call_args = mock_client.post.call_args
-        payload = call_args.kwargs.get("json") or call_args.args[1] if call_args.args else call_args.kwargs["json"]
+        payload = (
+            call_args.kwargs.get("json") or call_args.args[1]
+            if call_args.args
+            else call_args.kwargs["json"]
+        )
         return payload["text"]
 
     def test_script_tag_in_slug_is_html_escaped(self, mocker):
@@ -83,6 +88,7 @@ class TestHtmlEscaping:
 
 # ── Duration formatting ────────────────────────────────────────────────────────
 
+
 class TestFormatDuration:
     def test_90_seconds_formats_as_1m_30s(self):
         assert _format_duration(90) == "1m 30s"
@@ -106,14 +112,21 @@ class TestFormatDuration:
 
 # ── Functional tests ───────────────────────────────────────────────────────────
 
+
 class TestSendSuccessAck:
     def test_empty_projects_renders_as_dash(self, mocker):
         mock_client = _setup_httpx_mock(mocker)
         ts = datetime(2026, 3, 8, 12, 0, 0, tzinfo=timezone.utc)
         send_success_ack(
-            chat_id=123, title_slug="slug", domain="Engineering",
-            tags=["k8s"], projects=[], summary="Summary.",
-            duration_sec=60.0, word_count=10, timestamp=ts,
+            chat_id=123,
+            title_slug="slug",
+            domain="Engineering",
+            tags=["k8s"],
+            projects=[],
+            summary="Summary.",
+            duration_sec=60.0,
+            word_count=10,
+            timestamp=ts,
         )
         body = mock_client.post.call_args.kwargs["json"]["text"]
         assert "—" in body
@@ -122,9 +135,15 @@ class TestSendSuccessAck:
         mock_client = _setup_httpx_mock(mocker)
         ts = datetime(2026, 3, 8, 12, 0, 0, tzinfo=timezone.utc)
         send_success_ack(
-            chat_id=123, title_slug="slug", domain="Engineering",
-            tags=[], projects=[], summary="Summary.",
-            duration_sec=60.0, word_count=10, timestamp=ts,
+            chat_id=123,
+            title_slug="slug",
+            domain="Engineering",
+            tags=[],
+            projects=[],
+            summary="Summary.",
+            duration_sec=60.0,
+            word_count=10,
+            timestamp=ts,
         )
         body = mock_client.post.call_args.kwargs["json"]["text"]
         # Tags line should show — not empty
@@ -134,9 +153,15 @@ class TestSendSuccessAck:
         mock_client = _setup_httpx_mock(mocker)
         ts = datetime(2026, 3, 8, 14, 35, 0, tzinfo=timezone.utc)
         send_success_ack(
-            chat_id=123, title_slug="slug", domain="Engineering",
-            tags=["k8s"], projects=[], summary="Summary.",
-            duration_sec=60.0, word_count=10, timestamp=ts,
+            chat_id=123,
+            title_slug="slug",
+            domain="Engineering",
+            tags=["k8s"],
+            projects=[],
+            summary="Summary.",
+            duration_sec=60.0,
+            word_count=10,
+            timestamp=ts,
         )
         body = mock_client.post.call_args.kwargs["json"]["text"]
         # Timestamp should be formatted as YYYY-MM-DD HH:MM
@@ -146,9 +171,15 @@ class TestSendSuccessAck:
         mock_client = _setup_httpx_mock(mocker)
         ts = datetime(2026, 3, 8, 12, 0, 0, tzinfo=timezone.utc)
         send_success_ack(
-            chat_id=123, title_slug="slug", domain="Engineering",
-            tags=[], projects=[], summary="Summary.",
-            duration_sec=60.0, word_count=10, timestamp=ts,
+            chat_id=123,
+            title_slug="slug",
+            domain="Engineering",
+            tags=[],
+            projects=[],
+            summary="Summary.",
+            duration_sec=60.0,
+            word_count=10,
+            timestamp=ts,
         )
         payload = mock_client.post.call_args.kwargs["json"]
         assert payload["parse_mode"] == "HTML"
@@ -157,14 +188,21 @@ class TestSendSuccessAck:
         mock_client = _setup_httpx_mock(mocker)
         ts = datetime(2026, 3, 8, 12, 0, 0, tzinfo=timezone.utc)
         send_success_ack(
-            chat_id=123, title_slug="slug", domain="Engineering",
-            tags=[], projects=[], summary="Summary.",
-            duration_sec=60.0, word_count=10, timestamp=ts,
+            chat_id=123,
+            title_slug="slug",
+            domain="Engineering",
+            tags=[],
+            projects=[],
+            summary="Summary.",
+            duration_sec=60.0,
+            word_count=10,
+            timestamp=ts,
         )
         mock_client.post.assert_called_once()
 
 
 # ── Error notification tests ───────────────────────────────────────────────────
+
 
 class TestSendErrorNotification:
     def test_step_number_appears_in_message(self, mocker):
@@ -175,7 +213,9 @@ class TestSendErrorNotification:
 
     def test_reason_string_is_html_escaped(self, mocker):
         mock_client = _setup_httpx_mock(mocker)
-        send_error_notification(chat_id=123, step=4, reason="Error <details> here & there")
+        send_error_notification(
+            chat_id=123, step=4, reason="Error <details> here & there"
+        )
         body = mock_client.post.call_args.kwargs["json"]["text"]
         assert "<details>" not in body
         assert "&lt;details&gt;" in body

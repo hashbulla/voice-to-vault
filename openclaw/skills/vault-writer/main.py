@@ -152,7 +152,11 @@ def run(event: dict) -> dict:
     # ── Step 3: Detect language override ─────────────────────────────────────
     step = 3
     try:
-        lang = "en" if caption.lower() == "!en" else os.environ.get("WHISPER_LANGUAGE", "fr")
+        lang = (
+            "en"
+            if caption.lower() == "!en"
+            else os.environ.get("WHISPER_LANGUAGE", "fr")
+        )
         logger.info("Language selected: %s (caption=%r)", lang, caption)
     except Exception as exc:
         logger.error("Step %d failed: %s\n%s", step, exc, traceback.format_exc())
@@ -163,7 +167,9 @@ def run(event: dict) -> dict:
     step = 4
     try:
         whisper_prompt = os.environ.get("WHISPER_PROMPT", "")
-        transcript: VerboseTranscript = transcribe_audio(audio_bytes, lang, whisper_prompt)
+        transcript: VerboseTranscript = transcribe_audio(
+            audio_bytes, lang, whisper_prompt
+        )
         logger.info(
             "Transcript: %.1fs, %d chars", transcript.duration, len(transcript.text)
         )
@@ -233,6 +239,7 @@ def run(event: dict) -> dict:
         # Attempt minimal fallback notification
         try:
             from telegram_ack import _send_telegram_message
+
             _send_telegram_message(
                 chat_id,
                 f"✅ Note saved: <code>{classification.title_slug}</code> (ACK formatting failed)",
@@ -261,6 +268,7 @@ def run(event: dict) -> dict:
 # ── OpenClaw skill entry point ────────────────────────────────────────────────
 # OpenClaw calls handle(event) for skill-based integrations.
 
+
 def handle(event: dict) -> dict:
     """
     OpenClaw skill handler. Validates webhook secret, then wraps run() with
@@ -273,8 +281,11 @@ def handle(event: dict) -> dict:
     headers = event.get("headers", {})
     # Case-insensitive header lookup — Telegram sends X-Telegram-Bot-Api-Secret-Token
     received_secret = next(
-        (v for k, v in headers.items()
-         if k.lower() == "x-telegram-bot-api-secret-token"),
+        (
+            v
+            for k, v in headers.items()
+            if k.lower() == "x-telegram-bot-api-secret-token"
+        ),
         "",
     )
     if not hmac.compare_digest(_WEBHOOK_SECRET, received_secret):
@@ -290,9 +301,7 @@ def handle(event: dict) -> dict:
             "Unhandled exception in vault-writer:\n%s", traceback.format_exc()
         )
         # Attempt error notification — best effort
-        chat_id = (
-            event.get("message", {}).get("chat", {}).get("id")
-        )
+        chat_id = event.get("message", {}).get("chat", {}).get("id")
         if chat_id:
             send_error_notification(chat_id, 0, f"Unhandled: {str(exc)[:150]}")
         return {"status": "fatal_error", "error": str(exc)}

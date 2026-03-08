@@ -15,7 +15,9 @@ from transcriber import VerboseTranscript, transcribe_audio
 MAX_AUDIO_BYTES = 26_214_400  # 25 MB default
 
 
-def _make_mock_response(text="Bonjour monde.", language="fr", duration=10.0, segments=None):
+def _make_mock_response(
+    text="Bonjour monde.", language="fr", duration=10.0, segments=None
+):
     mock_resp = MagicMock()
     mock_resp.text = text
     mock_resp.language = language
@@ -49,8 +51,11 @@ class TestTranscribeAudio:
         audio = b"fake ogg audio data"
         transcribe_audio(audio, "fr", "")
         call_kwargs = mock_client.audio.transcriptions.create.call_args
-        assert call_kwargs.kwargs.get("language") == "fr" or \
-               call_kwargs.args[0] if call_kwargs.args else True
+        assert (
+            call_kwargs.kwargs.get("language") == "fr" or call_kwargs.args[0]
+            if call_kwargs.args
+            else True
+        )
         # Check via kwargs
         kwargs = mock_client.audio.transcriptions.create.call_args.kwargs
         assert kwargs["language"] == "fr"
@@ -114,9 +119,12 @@ class TestTranscribeAudio:
 
     def test_api_error_propagates(self, mocker):
         import openai as openai_module
+
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create.side_effect = openai_module.APIConnectionError(
-            request=MagicMock(), message="connection failed"
+        mock_client.audio.transcriptions.create.side_effect = (
+            openai_module.APIConnectionError(
+                request=MagicMock(), message="connection failed"
+            )
         )
         mocker.patch("transcriber.openai.OpenAI", return_value=mock_client)
         with pytest.raises(openai_module.APIConnectionError):

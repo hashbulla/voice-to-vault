@@ -84,10 +84,14 @@ def evaluate_fixture(filename: str, text: str) -> FixtureResult:
             hard_failures.append(f"domain '{domain}' not in VALID_DOMAINS")
 
         if not isinstance(tags, list) or not (1 <= len(tags) <= 5):
-            hard_failures.append(f"tags must be list of 1-5 items, got {len(tags)}: {tags}")
+            hard_failures.append(
+                f"tags must be list of 1-5 items, got {len(tags)}: {tags}"
+            )
 
         if not SLUG_RE.match(title_slug):
-            hard_failures.append(f"title_slug '{title_slug}' does not match ^[a-z0-9-]{{3,60}}$")
+            hard_failures.append(
+                f"title_slug '{title_slug}' does not match ^[a-z0-9-]{{3,60}}$"
+            )
 
         if not summary or not isinstance(summary, str):
             hard_failures.append("summary must be a non-empty string")
@@ -102,11 +106,11 @@ def evaluate_fixture(filename: str, text: str) -> FixtureResult:
     # Soft assertions
     soft_domain = None
     if filename in EXPECTED_DOMAINS:
-        soft_domain = (domain == EXPECTED_DOMAINS[filename])
+        soft_domain = domain == EXPECTED_DOMAINS[filename]
 
     soft_review = None
     if filename in EXPECTED_NEEDS_REVIEW:
-        soft_review = (needs_review == EXPECTED_NEEDS_REVIEW[filename])
+        soft_review = needs_review == EXPECTED_NEEDS_REVIEW[filename]
 
     return FixtureResult(
         filename=filename,
@@ -178,8 +182,14 @@ def main():
     for r in results:
         hard_str = "PASS" if r.hard_pass else "FAIL"
         exp_domain = EXPECTED_DOMAINS.get(r.filename, "—")
-        domain_match = "" if r.soft_domain_match is None else ("✓" if r.soft_domain_match else "✗")
-        review_match = "" if r.soft_needs_review_match is None else ("✓" if r.soft_needs_review_match else "✗")
+        domain_match = (
+            "" if r.soft_domain_match is None else ("✓" if r.soft_domain_match else "✗")
+        )
+        review_match = (
+            ""
+            if r.soft_needs_review_match is None
+            else ("✓" if r.soft_needs_review_match else "✗")
+        )
         report_lines.append(
             f"{r.filename:<45} {hard_str:<6} {r.domain:<16} {str(r.needs_review):<14} {exp_domain:<16} {domain_match} {review_match}"
         )
@@ -187,10 +197,12 @@ def main():
             for failure in r.hard_failures:
                 report_lines.append(f"  ❌ {failure}")
 
-    report_lines.extend([
-        "",
-        f"Total API cost estimate: ~${total_cost:.4f}",
-    ])
+    report_lines.extend(
+        [
+            "",
+            f"Total API cost estimate: ~${total_cost:.4f}",
+        ]
+    )
 
     report = "\n".join(report_lines)
     print("\n" + report)

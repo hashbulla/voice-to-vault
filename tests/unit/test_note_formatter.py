@@ -22,8 +22,11 @@ from transcriber import VerboseTranscript
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _make_transcript(text="Bonjour, voici ma note.", duration=42.0, language="fr"):
-    return VerboseTranscript(text=text, language=language, duration=duration, segments=[])
+    return VerboseTranscript(
+        text=text, language=language, duration=duration, segments=[]
+    )
 
 
 def _make_classification(
@@ -59,6 +62,7 @@ def _parse_frontmatter(content: str) -> dict:
 
 # ── _format_projects_as_wikilinks ──────────────────────────────────────────────
 
+
 class TestFormatProjectsAsWikilinks:
     def test_empty_list_returns_empty_yaml_array(self):
         assert _format_projects_as_wikilinks([]) == "[]"
@@ -79,6 +83,7 @@ class TestFormatProjectsAsWikilinks:
 
 # ── _format_tags_yaml ─────────────────────────────────────────────────────────
 
+
 class TestFormatTagsYaml:
     def test_empty_list_returns_empty_yaml_array(self):
         assert _format_tags_yaml([]) == "[]"
@@ -97,6 +102,7 @@ class TestFormatTagsYaml:
 
 
 # ── build_note ────────────────────────────────────────────────────────────────
+
 
 class TestBuildNote:
     def test_french_lang_produces_resume_ia_prefix(self):
@@ -186,7 +192,9 @@ class TestBuildNote:
         fm = _parse_frontmatter(body)
         date_str = fm["date"]
         # Should contain timezone offset (+HH:MM or Z)
-        assert re.search(r"[+\-]\d{2}:\d{2}$|Z$", date_str), f"No timezone in: {date_str}"
+        assert re.search(r"[+\-]\d{2}:\d{2}$|Z$", date_str), (
+            f"No timezone in: {date_str}"
+        )
 
     def test_duration_sec_formatted_to_1_decimal(self):
         t = _make_transcript(duration=95.347)

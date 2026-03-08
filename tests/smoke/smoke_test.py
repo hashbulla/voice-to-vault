@@ -29,8 +29,10 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 def _check_env():
     required = [
-        "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
-        "VAULT_REPO", "VAULT_DEPLOY_KEY_PATH",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "VAULT_REPO",
+        "VAULT_DEPLOY_KEY_PATH",
     ]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
@@ -45,13 +47,26 @@ def _load_audio_fixture() -> bytes:
     # Fallback: generate minimal OGG with ffmpeg if available
     import subprocess
     import tempfile
+
     try:
         with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as f:
             tmp_path = f.name
         result = subprocess.run(
-            ["ffmpeg", "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
-             "-c:a", "libvorbis", "-q:a", "3", "-y", tmp_path],
-            capture_output=True, timeout=30,
+            [
+                "ffmpeg",
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=frequency=440:duration=5",
+                "-c:a",
+                "libvorbis",
+                "-q:a",
+                "3",
+                "-y",
+                tmp_path,
+            ],
+            capture_output=True,
+            timeout=30,
         )
         if result.returncode == 0:
             audio = Path(tmp_path).read_bytes()
@@ -66,6 +81,7 @@ def _load_audio_fixture() -> bytes:
 
 def step1_transcription(audio: bytes) -> tuple[str, float]:
     from transcriber import transcribe_audio
+
     whisper_prompt = os.environ.get("WHISPER_PROMPT", "")
     result = transcribe_audio(audio, language="fr", whisper_prompt=whisper_prompt)
     assert result.text, "Transcription returned empty text"
@@ -75,6 +91,7 @@ def step1_transcription(audio: bytes) -> tuple[str, float]:
 
 def step2_classification(text: str) -> tuple:
     from classifier import classify_transcript, ClassificationResult
+
     result = classify_transcript(text, lang="fr")
     assert result.domain in VALID_DOMAINS, f"Invalid domain: {result.domain}"
     assert result.title_slug, "title_slug is empty"
@@ -86,6 +103,7 @@ def step2_classification(text: str) -> tuple:
 def step3_formatting(transcript_obj, classification) -> tuple[str, str]:
     from note_formatter import build_note
     from transcriber import VerboseTranscript
+
     file_path, content = build_note(transcript_obj, classification, lang="fr")
     assert file_path.startswith("00_Inbox/"), f"Bad file_path: {file_path}"
     assert "---\n" in content, "No frontmatter in note content"
@@ -116,6 +134,7 @@ def step5_daemon() -> str:
     if not daemon_url:
         return "SKIPPED"
     import httpx
+
     try:
         resp = httpx.get(f"{daemon_url}/health", timeout=5.0)
         assert resp.status_code == 200, f"Health check failed: {resp.status_code}"
@@ -150,11 +169,18 @@ def main():
     # Step 2: Classification
     try:
         from transcriber import VerboseTranscript
-        transcript_obj = VerboseTranscript(text=text, language="fr", duration=duration, segments=[])
+
+        transcript_obj = VerboseTranscript(
+            text=text, language="fr", duration=duration, segments=[]
+        )
         classification = step2_classification(text)
-        results["step2"] = f"PASS (domain={classification.domain}, slug={classification.title_slug})"
+        results["step2"] = (
+            f"PASS (domain={classification.domain}, slug={classification.title_slug})"
+        )
         total_cost_est += 0.0001  # Haiku cost estimate
-        print(f"Step 2 Haiku:   PASS  (domain={classification.domain}, slug={classification.title_slug})")
+        print(
+            f"Step 2 Haiku:   PASS  (domain={classification.domain}, slug={classification.title_slug})"
+        )
     except Exception as exc:
         results["step2"] = f"FAIL ({exc})"
         print(f"Step 2 Haiku:   FAIL  ({exc})")
@@ -165,7 +191,10 @@ def main():
     # Step 3: Note formatting
     try:
         from transcriber import VerboseTranscript
-        transcript_obj = VerboseTranscript(text=text, language="fr", duration=duration, segments=[])
+
+        transcript_obj = VerboseTranscript(
+            text=text, language="fr", duration=duration, segments=[]
+        )
         file_path, content = step3_formatting(transcript_obj, classification)
         results["step3"] = "PASS"
         print(f"Step 3 Format:  PASS  (path={file_path})")

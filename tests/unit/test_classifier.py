@@ -22,6 +22,7 @@ from classifier import (
 
 # ── _sanitise_slug ─────────────────────────────────────────────────────────────
 
+
 class TestSanitiseSlug:
     def test_uppercase_converted_to_lowercase(self):
         assert _sanitise_slug("MySlug") == "myslug"
@@ -58,7 +59,9 @@ class TestSanitiseSlug:
         assert not result.endswith("-")
 
     def test_all_lowercase_clean_slug_unchanged(self):
-        assert _sanitise_slug("kubernetes-operator-design") == "kubernetes-operator-design"
+        assert (
+            _sanitise_slug("kubernetes-operator-design") == "kubernetes-operator-design"
+        )
 
     def test_empty_string_returns_empty(self):
         # _sanitise_slug("") → "" (caller handles defaulting)
@@ -71,6 +74,7 @@ class TestSanitiseSlug:
 
 
 # ── _parse_classifier_response ────────────────────────────────────────────────
+
 
 class TestParseClassifierResponse:
     def _valid_payload(self, **overrides) -> dict:
@@ -193,6 +197,7 @@ class TestParseClassifierResponse:
 
 # ── classify_transcript ───────────────────────────────────────────────────────
 
+
 class TestClassifyTranscript:
     def _make_mock_client(self, mocker, response_text: str):
         mock_client = MagicMock()
@@ -203,17 +208,20 @@ class TestClassifyTranscript:
         return mock_client
 
     def _valid_response(self) -> str:
-        return json.dumps({
-            "domain": "Engineering",
-            "projects": [],
-            "tags": ["k8s", "operator"],
-            "summary": "Un résumé.",
-            "needs_review": False,
-            "title_slug": "kubernetes-operator",
-        })
+        return json.dumps(
+            {
+                "domain": "Engineering",
+                "projects": [],
+                "tags": ["k8s", "operator"],
+                "summary": "Un résumé.",
+                "needs_review": False,
+                "title_slug": "kubernetes-operator",
+            }
+        )
 
     def test_system_prompt_sent_unchanged(self, mocker):
         from classifier import CLASSIFIER_SYSTEM_PROMPT
+
         mock_client = self._make_mock_client(mocker, self._valid_response())
         classify_transcript("test transcript", "fr")
         call_kwargs = mock_client.messages.create.call_args
@@ -235,6 +243,7 @@ class TestClassifyTranscript:
 
     def test_api_error_propagates(self, mocker):
         import anthropic as anthropic_module
+
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = anthropic_module.APIConnectionError(
             request=MagicMock()

@@ -15,6 +15,7 @@ import git_writer
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _set_env(monkeypatch, vault_clone_dir: str):
     monkeypatch.setenv("VAULT_REPO", "owner/vault")
     monkeypatch.setenv("VAULT_BRANCH", "main")
@@ -23,6 +24,7 @@ def _set_env(monkeypatch, vault_clone_dir: str):
 
 
 # ── _git_env ──────────────────────────────────────────────────────────────────
+
 
 class TestGitEnv:
     def test_git_ssh_command_set_with_deploy_key(self):
@@ -40,6 +42,7 @@ class TestGitEnv:
 
 
 # ── _clone_or_pull ────────────────────────────────────────────────────────────
+
 
 class TestCloneOrPull:
     def test_initial_clone_when_dir_not_exist(self, tmp_path, monkeypatch):
@@ -83,8 +86,11 @@ class TestCloneOrPull:
         assert len(fetch_cmds) >= 1
         assert len(reset_cmds) >= 1
 
-    def test_shallow_clone_fallback_triggers_unshallow(self, tmp_path, monkeypatch, caplog):
+    def test_shallow_clone_fallback_triggers_unshallow(
+        self, tmp_path, monkeypatch, caplog
+    ):
         import logging
+
         clone_dir = tmp_path / "vault-clone"
         clone_dir.mkdir()
         (clone_dir / ".git").mkdir()
@@ -96,7 +102,9 @@ class TestCloneOrPull:
             if "reset" in cmd and "--hard" in cmd:
                 call_count["reset"] += 1
                 if call_count["reset"] == 1:
-                    raise RuntimeError("fatal: shallow file has changed since last read")
+                    raise RuntimeError(
+                        "fatal: shallow file has changed since last read"
+                    )
             return ""
 
         with caplog.at_level(logging.INFO, logger="git_writer"):
@@ -108,8 +116,16 @@ class TestCloneOrPull:
 
 # ── write_note_and_push ───────────────────────────────────────────────────────
 
+
 class TestWriteNoteAndPush:
-    def _run_write(self, tmp_path, monkeypatch, file_path="00_Inbox/2026-03-08-test.md", content="test content", title_slug="test-slug"):
+    def _run_write(
+        self,
+        tmp_path,
+        monkeypatch,
+        file_path="00_Inbox/2026-03-08-test.md",
+        content="test content",
+        title_slug="test-slug",
+    ):
         clone_dir = tmp_path / "vault-clone"
         clone_dir.mkdir()
         (clone_dir / ".git").mkdir()

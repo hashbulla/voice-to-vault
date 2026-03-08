@@ -54,9 +54,7 @@ def _send_telegram_message(chat_id: str | int, text: str) -> None:
             response.status_code,
             response.text[:200],
         )
-        raise RuntimeError(
-            f"Telegram sendMessage failed: HTTP {response.status_code}"
-        )
+        raise RuntimeError(f"Telegram sendMessage failed: HTTP {response.status_code}")
 
     data = response.json()
     if not data.get("ok"):
@@ -107,7 +105,9 @@ def send_success_ack(
     ts_str = timestamp.strftime("%Y-%m-%d %H:%M")
     duration_str = _format_duration(duration_sec)
     tags_str = " ".join(f"#{_esc(t)}" for t in tags) if tags else "—"
-    project_str = "[[" + "]], [[".join(_esc(p) for p in projects) + "]]" if projects else "—"
+    project_str = (
+        "[[" + "]], [[".join(_esc(p) for p in projects) + "]]" if projects else "—"
+    )
 
     message = (
         f"✅ <b>Note captured</b> — {ts_str}\n"

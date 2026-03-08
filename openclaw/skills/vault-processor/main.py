@@ -102,7 +102,9 @@ def handle_event(event: dict) -> dict:
         else:
             log.error(
                 "Unexpected trigger response %d for user %s: %s",
-                resp.status_code, sender_id, resp.text,
+                resp.status_code,
+                sender_id,
+                resp.text,
             )
             _send_telegram(
                 chat_id,

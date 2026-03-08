@@ -21,14 +21,23 @@ MAX_AUDIO_BYTES = 26_214_400
 def _import_main(monkeypatch, webhook_secret="test-secret-abc123"):
     monkeypatch.setenv("OPENCLAW_WEBHOOK_SECRET", webhook_secret)
     for mod in list(sys.modules.keys()):
-        if mod in ("main", "classifier", "git_writer", "note_formatter",
-                   "telegram_ack", "transcriber"):
+        if mod in (
+            "main",
+            "classifier",
+            "git_writer",
+            "note_formatter",
+            "telegram_ack",
+            "transcriber",
+        ):
             sys.modules.pop(mod, None)
     import main
+
     return main
 
 
-def _base_event(user_id=999888777, file_id="FILE123", caption=None, secret="test-secret-abc123"):
+def _base_event(
+    user_id=999888777, file_id="FILE123", caption=None, secret="test-secret-abc123"
+):
     event = {
         "message": {
             "message_id": 1,
@@ -53,6 +62,7 @@ def _base_event(user_id=999888777, file_id="FILE123", caption=None, secret="test
 
 # ── Webhook secret validation ─────────────────────────────────────────────────
 
+
 @pytest.mark.integration
 class TestWebhookSecretValidation:
     def test_valid_secret_proceeds(self, monkeypatch, caplog):
@@ -60,13 +70,25 @@ class TestWebhookSecretValidation:
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 1.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], [], "s.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 1.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], [], "s.", False, "slug"
+                ),
+            ),
+            patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.handle(_base_event())
 
         assert result["status"] == "success"
@@ -86,14 +108,18 @@ class TestWebhookSecretValidation:
 
     def test_invalid_secret_emits_warning_log(self, monkeypatch, caplog):
         import logging
+
         main = _import_main(monkeypatch)
         with caplog.at_level(logging.WARNING, logger="vault-writer"):
             main.handle(_base_event(secret="WRONG_SECRET"))
-        assert any("secret" in r.message.lower() or "mismatch" in r.message.lower()
-                   for r in caplog.records)
+        assert any(
+            "secret" in r.message.lower() or "mismatch" in r.message.lower()
+            for r in caplog.records
+        )
 
     def test_warning_does_not_log_full_secret(self, monkeypatch, caplog):
         import logging
+
         main = _import_main(monkeypatch)
         long_secret = "a" * 40
         with caplog.at_level(logging.WARNING, logger="vault-writer"):
@@ -119,6 +145,7 @@ class TestWebhookSecretValidation:
 
 # ── User ID allowlist ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.integration
 class TestUserIdAllowlist:
     def test_correct_user_id_proceeds(self, monkeypatch):
@@ -126,13 +153,25 @@ class TestUserIdAllowlist:
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 1.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], [], "s.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 1.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], [], "s.", False, "slug"
+                ),
+            ),
+            patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.run(_base_event(user_id=999888777))
 
         assert result["status"] == "success"
@@ -152,13 +191,25 @@ class TestUserIdAllowlist:
         from classifier import ClassificationResult
 
         event = _base_event(user_id=999888777)  # already int in _base_event
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 1.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], [], "s.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 1.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], [], "s.", False, "slug"
+                ),
+            ),
+            patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.run(event)
 
         assert result["status"] == "success"
@@ -175,6 +226,7 @@ class TestUserIdAllowlist:
 
 # ── Caption sanitisation ──────────────────────────────────────────────────────
 
+
 @pytest.mark.integration
 class TestCaptionSanitisation:
     def _get_lang(self, monkeypatch, caption):
@@ -184,16 +236,26 @@ class TestCaptionSanitisation:
         def fake_transcribe(audio, lang, prompt):
             captured["lang"] = lang
             from transcriber import VerboseTranscript
+
             return VerboseTranscript("text", lang, 1.0, [])
 
         from classifier import ClassificationResult
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", side_effect=fake_transcribe), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], [], "s.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(main, "transcribe_audio", side_effect=fake_transcribe),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], [], "s.", False, "slug"
+                ),
+            ),
+            patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             main.run(_base_event(caption=caption))
 
         return captured.get("lang")
@@ -223,15 +285,18 @@ class TestCaptionSanitisation:
 
 # ── Audio size limit ──────────────────────────────────────────────────────────
 
+
 @pytest.mark.integration
 class TestAudioSizeLimit:
     def test_audio_over_max_bytes_rejected(self, monkeypatch):
         main = _import_main(monkeypatch)
         oversized = b"x" * (MAX_AUDIO_BYTES + 1)
 
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=oversized), \
-             patch.object(main, "send_error_notification"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=oversized),
+            patch.object(main, "send_error_notification"),
+        ):
             result = main.run(_base_event())
 
         assert result["status"] == "error"
@@ -242,13 +307,25 @@ class TestAudioSizeLimit:
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="f.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=exact_size), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 1.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], [], "s.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="f.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=exact_size),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 1.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], [], "s.", False, "slug"
+                ),
+            ),
+            patch.object(main, "build_note", return_value=("00_Inbox/x.md", "content")),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.run(_base_event())
 
         # Exact size is accepted — should not error on size alone

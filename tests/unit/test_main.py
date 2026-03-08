@@ -15,19 +15,29 @@ import pytest
 
 # ── Module-level import helper ────────────────────────────────────────────────
 
+
 def _import_main(monkeypatch, webhook_secret="test-secret-abc123"):
     """Import main module with required env set."""
     monkeypatch.setenv("OPENCLAW_WEBHOOK_SECRET", webhook_secret)
     # Force re-import since module reads env at import time
     for mod in list(sys.modules.keys()):
-        if mod in ("main", "classifier", "git_writer", "note_formatter",
-                   "telegram_ack", "transcriber"):
+        if mod in (
+            "main",
+            "classifier",
+            "git_writer",
+            "note_formatter",
+            "telegram_ack",
+            "transcriber",
+        ):
             sys.modules.pop(mod, None)
     import main
+
     return main
 
 
-def _base_event(user_id="999888777", file_id="FILE123", caption=None, secret="test-secret-abc123"):
+def _base_event(
+    user_id="999888777", file_id="FILE123", caption=None, secret="test-secret-abc123"
+):
     event = {
         "message": {
             "message_id": 1,
@@ -52,16 +62,19 @@ def _base_event(user_id="999888777", file_id="FILE123", caption=None, secret="te
 
 # ── Security: user allowlist ───────────────────────────────────────────────────
 
+
 class TestUserAllowlist:
     def test_non_whitelisted_user_returns_rejected(self, monkeypatch):
         main = _import_main(monkeypatch)
         event = _base_event(user_id="111000111")
 
-        with patch.object(main, "get_telegram_file_path", MagicMock()) as m_get, \
-             patch.object(main, "download_telegram_audio", MagicMock()) as m_dl, \
-             patch.object(main, "transcribe_audio", MagicMock()) as m_tr, \
-             patch.object(main, "classify_transcript", MagicMock()) as m_cl, \
-             patch.object(main, "write_note_and_push", MagicMock()) as m_git:
+        with (
+            patch.object(main, "get_telegram_file_path", MagicMock()) as m_get,
+            patch.object(main, "download_telegram_audio", MagicMock()) as m_dl,
+            patch.object(main, "transcribe_audio", MagicMock()) as m_tr,
+            patch.object(main, "classify_transcript", MagicMock()) as m_cl,
+            patch.object(main, "write_note_and_push", MagicMock()) as m_git,
+        ):
             result = main.run(event)
 
         assert result["status"] == "rejected"
@@ -74,23 +87,33 @@ class TestUserAllowlist:
     def test_whitelisted_user_proceeds(self, monkeypatch):
         main = _import_main(monkeypatch)
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio") as m_tr, \
-             patch.object(main, "classify_transcript") as m_cl, \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-slug.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(main, "transcribe_audio") as m_tr,
+            patch.object(main, "classify_transcript") as m_cl,
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-slug.md", "content"),
+            ),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             from transcriber import VerboseTranscript
             from classifier import ClassificationResult
+
             m_tr.return_value = VerboseTranscript("text", "fr", 90.0, [])
-            m_cl.return_value = ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "my-slug")
+            m_cl.return_value = ClassificationResult(
+                "Engineering", [], ["k8s"], "Summary.", False, "my-slug"
+            )
             result = main.run(_base_event())
 
         assert result["status"] == "success"
 
 
 # ── Missing file_id ────────────────────────────────────────────────────────────
+
 
 class TestMissingFileId:
     def test_missing_voice_file_id_returns_error_step_1(self, monkeypatch):
@@ -108,6 +131,7 @@ class TestMissingFileId:
 
 # ── Caption / language detection ──────────────────────────────────────────────
 
+
 class TestCaptionLanguageDetection:
     def _run_with_caption(self, monkeypatch, caption):
         main = _import_main(monkeypatch)
@@ -116,17 +140,27 @@ class TestCaptionLanguageDetection:
         def fake_transcribe(audio_bytes, language, whisper_prompt):
             captured["lang"] = language
             from transcriber import VerboseTranscript
+
             return VerboseTranscript("text", language, 90.0, [])
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", side_effect=fake_transcribe), \
-             patch.object(main, "classify_transcript") as m_cl, \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-slug.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(main, "transcribe_audio", side_effect=fake_transcribe),
+            patch.object(main, "classify_transcript") as m_cl,
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-slug.md", "content"),
+            ),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             from classifier import ClassificationResult
-            m_cl.return_value = ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "my-slug")
+
+            m_cl.return_value = ClassificationResult(
+                "Engineering", [], ["k8s"], "Summary.", False, "my-slug"
+            )
             main.run(_base_event(caption=caption))
 
         return captured.get("lang")
@@ -150,6 +184,7 @@ class TestCaptionLanguageDetection:
 
 # ── Step failure handling ─────────────────────────────────────────────────────
 
+
 class TestStepFailures:
     def _run_with_step_failure(self, monkeypatch, fail_step: int):
         main = _import_main(monkeypatch)
@@ -159,9 +194,17 @@ class TestStepFailures:
         patches = {
             "get_telegram_file_path": MagicMock(return_value="voice/file.ogg"),
             "download_telegram_audio": MagicMock(return_value=b"audio"),
-            "transcribe_audio": MagicMock(return_value=VerboseTranscript("text", "fr", 90.0, [])),
-            "classify_transcript": MagicMock(return_value=ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "slug")),
-            "build_note": MagicMock(return_value=("00_Inbox/2026-03-08-slug.md", "content")),
+            "transcribe_audio": MagicMock(
+                return_value=VerboseTranscript("text", "fr", 90.0, [])
+            ),
+            "classify_transcript": MagicMock(
+                return_value=ClassificationResult(
+                    "Engineering", [], ["k8s"], "Summary.", False, "slug"
+                )
+            ),
+            "build_note": MagicMock(
+                return_value=("00_Inbox/2026-03-08-slug.md", "content")
+            ),
             "write_note_and_push": MagicMock(return_value="abc" * 14),
             "send_success_ack": MagicMock(),
             "send_error_notification": MagicMock(),
@@ -173,7 +216,9 @@ class TestStepFailures:
             7: "write_note_and_push",
         }
         if fail_step in step_to_fn:
-            patches[step_to_fn[fail_step]].side_effect = RuntimeError(f"Step {fail_step} failed")
+            patches[step_to_fn[fail_step]].side_effect = RuntimeError(
+                f"Step {fail_step} failed"
+            )
 
         with patch.multiple(main, **patches):
             result = main.run(_base_event())
@@ -203,11 +248,15 @@ class TestStepFailures:
         main = _import_main(monkeypatch)
         m_classify = MagicMock()
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", side_effect=RuntimeError("Whisper down")), \
-             patch.object(main, "classify_transcript", m_classify), \
-             patch.object(main, "send_error_notification"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main, "transcribe_audio", side_effect=RuntimeError("Whisper down")
+            ),
+            patch.object(main, "classify_transcript", m_classify),
+            patch.object(main, "send_error_notification"),
+        ):
             main.run(_base_event())
 
         m_classify.assert_not_called()
@@ -217,13 +266,31 @@ class TestStepFailures:
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 90.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-slug.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack", side_effect=RuntimeError("Telegram down")):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 90.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], ["k8s"], "Summary.", False, "slug"
+                ),
+            ),
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-slug.md", "content"),
+            ),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(
+                main, "send_success_ack", side_effect=RuntimeError("Telegram down")
+            ),
+        ):
             result = main.run(_base_event())
 
         # ACK failure is non-fatal — pipeline should still return success
@@ -231,6 +298,7 @@ class TestStepFailures:
 
 
 # ── _require_env ──────────────────────────────────────────────────────────────
+
 
 class TestRequireEnv:
     def test_raises_if_required_var_missing(self, monkeypatch):
@@ -244,13 +312,29 @@ class TestRequireEnv:
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 90.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-slug.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 90.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], ["k8s"], "Summary.", False, "slug"
+                ),
+            ),
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-slug.md", "content"),
+            ),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.run(_base_event())
 
         assert result["status"] == "success"
@@ -258,19 +342,40 @@ class TestRequireEnv:
 
 # ── Full success path ─────────────────────────────────────────────────────────
 
+
 class TestFullSuccessPath:
     def test_returns_all_required_fields(self, monkeypatch):
         main = _import_main(monkeypatch)
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("hello world", "fr", 95.3, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "kubernetes-operator")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-kubernetes-operator.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc123def456abc123def456abc123def456abc1"), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("hello world", "fr", 95.3, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], ["k8s"], "Summary.", False, "kubernetes-operator"
+                ),
+            ),
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-kubernetes-operator.md", "content"),
+            ),
+            patch.object(
+                main,
+                "write_note_and_push",
+                return_value="abc123def456abc123def456abc123def456abc1",
+            ),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.run(_base_event())
 
         assert result["status"] == "success"
@@ -285,19 +390,36 @@ class TestFullSuccessPath:
 
 # ── handle() — webhook secret validation ─────────────────────────────────────
 
+
 class TestHandleWebhookSecret:
     def test_valid_secret_proceeds(self, monkeypatch):
         main = _import_main(monkeypatch)
         from transcriber import VerboseTranscript
         from classifier import ClassificationResult
 
-        with patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"), \
-             patch.object(main, "download_telegram_audio", return_value=b"audio"), \
-             patch.object(main, "transcribe_audio", return_value=VerboseTranscript("text", "fr", 90.0, [])), \
-             patch.object(main, "classify_transcript", return_value=ClassificationResult("Engineering", [], ["k8s"], "Summary.", False, "slug")), \
-             patch.object(main, "build_note", return_value=("00_Inbox/2026-03-08-slug.md", "content")), \
-             patch.object(main, "write_note_and_push", return_value="abc" * 14), \
-             patch.object(main, "send_success_ack"):
+        with (
+            patch.object(main, "get_telegram_file_path", return_value="voice/file.ogg"),
+            patch.object(main, "download_telegram_audio", return_value=b"audio"),
+            patch.object(
+                main,
+                "transcribe_audio",
+                return_value=VerboseTranscript("text", "fr", 90.0, []),
+            ),
+            patch.object(
+                main,
+                "classify_transcript",
+                return_value=ClassificationResult(
+                    "Engineering", [], ["k8s"], "Summary.", False, "slug"
+                ),
+            ),
+            patch.object(
+                main,
+                "build_note",
+                return_value=("00_Inbox/2026-03-08-slug.md", "content"),
+            ),
+            patch.object(main, "write_note_and_push", return_value="abc" * 14),
+            patch.object(main, "send_success_ack"),
+        ):
             result = main.handle(_base_event(secret="test-secret-abc123"))
 
         assert result["status"] == "success"

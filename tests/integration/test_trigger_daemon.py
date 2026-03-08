@@ -25,6 +25,7 @@ def trigger_env(monkeypatch, tmp_path):
     monkeypatch.setenv("TRIGGER_SECRET", "super-secret-trigger-key")
     # Patch lock file and run.sh to be in tmp_path
     import trigger_server
+
     monkeypatch.setattr(trigger_server, "LOCK_FILE", tmp_path / "test.lock")
     # Create a fake run.sh so the "not found" check passes
     fake_run_sh = tmp_path / "run.sh"
@@ -38,10 +39,12 @@ def trigger_env(monkeypatch, tmp_path):
 def client(trigger_env):
     from fastapi.testclient import TestClient
     import trigger_server
+
     return TestClient(trigger_server.app)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.integration
 class TestHealth:
@@ -52,6 +55,7 @@ class TestHealth:
 
 
 # ── Trigger ───────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.integration
 class TestTrigger:
@@ -92,6 +96,7 @@ class TestTrigger:
 
     def test_lock_file_with_live_pid_returns_409(self, client, trigger_env):
         import trigger_server
+
         lock_file = trigger_server.LOCK_FILE
         # Write current process PID (definitely alive)
         lock_file.write_text(str(os.getpid()))
@@ -111,6 +116,7 @@ class TestTrigger:
 
     def test_lock_file_with_dead_pid_returns_202(self, client, trigger_env):
         import trigger_server
+
         lock_file = trigger_server.LOCK_FILE
         # PID 99999999 is almost certainly dead
         lock_file.write_text("99999999")
