@@ -170,3 +170,30 @@ lint: ## Lint Python skill code
 format: ## Auto-format Python skill code
 	@command -v ruff >/dev/null 2>&1 || pip install ruff -q
 	ruff format $(SKILL_DIR)/
+
+## ── Test suite ────────────────────────────────────────────────────────────────
+.PHONY: test-unit test-integration test-ci test-eval-classifier test-eval-agent test-smoke
+
+test-unit: ## Run unit tests with coverage (≥85%)
+	pytest tests/unit/ -v --cov=openclaw/skills/vault-writer \
+	  --cov-report=term-missing --cov-fail-under=85
+
+test-integration: ## Run integration tests (all external calls mocked)
+	pytest tests/integration/ -v
+
+test-ci: test-unit test-integration ## Run full CI test suite (unit + integration)
+
+test-eval-classifier: ## Run classifier evaluation (real Anthropic API calls ~$$0.02)
+	@echo "⚠️  This makes real Anthropic API calls (~\$$0.02)"
+	@read -p "Continue? [y/N] " c; [ "$$c" = "y" ] || exit 1
+	python tests/evaluation/classifier_eval.py
+
+test-eval-agent: ## Run agent evaluation (real Claude Code calls against vault fixture)
+	@echo "⚠️  This makes real Claude Code calls against vault fixture"
+	@read -p "Continue? [y/N] " c; [ "$$c" = "y" ] || exit 1
+	python tests/evaluation/agent_eval.py
+
+test-smoke: ## Run smoke test (real APIs ~$$0.02, writes to smoke-test branch)
+	@echo "⚠️  This makes real API calls (~\$$0.02) and writes to smoke-test branch"
+	@read -p "Continue? [y/N] " c; [ "$$c" = "y" ] || exit 1
+	python tests/smoke/smoke_test.py

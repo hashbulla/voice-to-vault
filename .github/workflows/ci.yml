@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install ruff mypy
+
+      - name: ruff check
+        run: ruff check openclaw/ tests/unit/ tests/integration/
+
+      - name: ruff format check
+        run: ruff format --check openclaw/ tests/
+
+      - name: mypy type check
+        run: mypy openclaw/skills/vault-writer/ --ignore-missing-imports
+
+  unit-tests:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r openclaw/skills/vault-writer/requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit/ -v --tb=short \
+            --cov=openclaw/skills/vault-writer \
+            --cov-report=term-missing \
+            --cov-fail-under=85
+        env:
+          OPENCLAW_WEBHOOK_SECRET: test-secret-for-ci
+
+  integration-tests:
+    name: Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure git (for real git ops in integration tests)
+        run: |
+          git config --global user.email "ci@voice-to-vault"
+          git config --global user.name "CI"
+
+      - name: Install dependencies
+        run: |
+          pip install -r openclaw/skills/vault-writer/requirements.txt
+          pip install -r requirements-test.txt
+          pip install -r trigger_daemon/requirements.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
+        env:
+          OPENCLAW_WEBHOOK_SECRET: test-secret-for-ci
