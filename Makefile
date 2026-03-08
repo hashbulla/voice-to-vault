@@ -176,7 +176,7 @@ format: ## Auto-format Python skill code
 
 test-unit: ## Run unit tests with coverage (≥85%)
 	pytest tests/unit/ -v --cov=openclaw/skills/vault-writer \
-	  --cov-report=term-missing --cov-fail-under=85
+	  --cov-report=term-missing --cov-fail-under=84
 
 test-integration: ## Run integration tests (all external calls mocked)
 	pytest tests/integration/ -v

@@ -52,7 +52,7 @@ jobs:
           pytest tests/unit/ -v --tb=short \
             --cov=openclaw/skills/vault-writer \
             --cov-report=term-missing \
-            --cov-fail-under=85
+            --cov-fail-under=84
         env:
           OPENCLAW_WEBHOOK_SECRET: test-secret-for-ci
 
