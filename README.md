@@ -94,6 +94,20 @@ Hetzner cron (TZ=Europe/Paris)
 
 ---
 
+## Capability Matrix
+
+| Capability                    | STT Obsidian Plugin                | voice-to-vault                                     |
+| ----------------------------- | ---------------------------------- | -------------------------------------------------- |
+| Capture surface               | Obsidian must be open              | Telegram, any device, app closed, walking          |
+| Classification                | None — you manually tag everything | Claude Haiku generates domain, tags, summary, slug |
+| Frontmatter                   | None                               | Full YAML schema on every note                     |
+| Cross-device frictionless     | ❌                                  | ✅                                                  |
+| Git history / audit trail     | ❌                                  | ✅ per-note commits                                 |
+| Pipeline extensibility        | ❌ zero                             | ✅ add skills at will                               |
+| Works when Obsidian is closed | ❌                                  | ✅                                                  |
+
+---
+
 ## Stack
 
 | Component | Technology | Role | Why this, not that |
