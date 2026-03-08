@@ -61,7 +61,7 @@ def _clone_or_pull(repo: str, branch: str, deploy_key_path: str) -> Path:
     Ensure a local clone of the vault repo exists and is up to date.
 
     Uses SSH URL for push access. If clone already exists, does a
-    fast-forward pull. If it does not exist, clones with --depth=1
+    fast-forward pull. If it does not exist, clones with --depth=50
     for efficiency.
 
     Args:
@@ -81,11 +81,22 @@ def _clone_or_pull(repo: str, branch: str, deploy_key_path: str) -> Path:
     if _CLONE_CACHE_DIR.exists() and (_CLONE_CACHE_DIR / ".git").exists():
         logger.info("Pulling latest from %s/%s", repo, branch)
         _run(["git", "fetch", "origin", branch], cwd=_CLONE_CACHE_DIR, env=env)
-        _run(
-            ["git", "reset", "--hard", f"origin/{branch}"],
-            cwd=_CLONE_CACHE_DIR,
-            env=env,
-        )
+        try:
+            _run(
+                ["git", "reset", "--hard", f"origin/{branch}"],
+                cwd=_CLONE_CACHE_DIR,
+                env=env,
+            )
+        except RuntimeError:
+            logger.info(
+                "Shallow history detected — running git fetch --unshallow before retry"
+            )
+            _run(["git", "fetch", "--unshallow"], cwd=_CLONE_CACHE_DIR, env=env)
+            _run(
+                ["git", "reset", "--hard", f"origin/{branch}"],
+                cwd=_CLONE_CACHE_DIR,
+                env=env,
+            )
     else:
         logger.info("Cloning %s (branch=%s) into %s", repo, branch, _CLONE_CACHE_DIR)
         _CLONE_CACHE_DIR.parent.mkdir(parents=True, exist_ok=True)
@@ -93,7 +104,7 @@ def _clone_or_pull(repo: str, branch: str, deploy_key_path: str) -> Path:
             [
                 "git",
                 "clone",
-                "--depth=1",
+                "--depth=50",
                 "--branch",
                 branch,
                 ssh_url,

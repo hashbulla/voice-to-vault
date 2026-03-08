@@ -100,7 +100,6 @@ cd "${VAULT_CLONE_DIR}"
 AGENT_EXIT_CODE=0
 claude \
     --dangerously-skip-permissions \
-    --print \
     < "${AGENT_PROMPT}" \
     >> "${LOG_FILE}" 2>&1 || AGENT_EXIT_CODE=$?
 

@@ -7,6 +7,7 @@ All messages are sent via the Telegram Bot API sendMessage endpoint.
 
 from __future__ import annotations
 
+import html
 import logging
 import os
 from datetime import datetime, timezone
@@ -16,6 +17,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
+
+
+def _esc(value: str) -> str:
+    """Escape a string for safe insertion into an HTML parse_mode Telegram message."""
+    return html.escape(value, quote=False)
 
 
 def _send_telegram_message(chat_id: str | int, text: str) -> None:
@@ -100,18 +106,18 @@ def send_success_ack(
 
     ts_str = timestamp.strftime("%Y-%m-%d %H:%M")
     duration_str = _format_duration(duration_sec)
-    tags_str = " ".join(f"#{t}" for t in tags) if tags else "—"
-    project_str = "[[" + "]], [[".join(projects) + "]]" if projects else "—"
+    tags_str = " ".join(f"#{_esc(t)}" for t in tags) if tags else "—"
+    project_str = "[[" + "]], [[".join(_esc(p) for p in projects) + "]]" if projects else "—"
 
     message = (
         f"✅ <b>Note captured</b> — {ts_str}\n"
         f"\n"
-        f"📋 <code>{title_slug}</code>\n"
-        f"🗂 Domain: <b>{domain}</b>\n"
+        f"📋 <code>{_esc(title_slug)}</code>\n"
+        f"🗂 Domain: <b>{_esc(domain)}</b>\n"
         f"🏷 Tags: {tags_str}\n"
         f"📁 Project: {project_str}\n"
         f"⏱ Duration: {duration_str}  |  📝 Words: {word_count}\n"
-        f"🔍 Summary: <i>{summary}</i>\n"
+        f"🔍 Summary: <i>{_esc(summary)}</i>\n"
         f"\n"
         f"📥 Status: inbox — awaiting nightly processing"
     )
@@ -137,7 +143,7 @@ def send_error_notification(
         reason: Short human-readable error description.
     """
     message = (
-        f"❌ <b>Pipeline failed at step {step}:</b> {reason}\n"
+        f"❌ <b>Pipeline failed at step {step}:</b> {_esc(reason)}\n"
         f"\n"
         f"Check container logs for full traceback."
     )
