@@ -1,6 +1,6 @@
 ## Improvement Proposals — Ranked by ROI
 
-Here are six improvements I consider core, not overkill. Ordered by value-to-effort ratio.
+Here are improvements I consider core, not overkill. Ordered by value-to-effort ratio.
 
 ***
 
@@ -87,3 +87,53 @@ A Friday 18:00 OpenClaw cron that sends you a Telegram summary:
 High delight, low code — one new cron entry and one new OpenClaw skill reading `_Daily/` files. I recommend deferring this until the vault has 3+ weeks of real data so the digest is meaningful rather than empty.
 
 ***
+
+## [P2] IaC: One-Command VPS Rebuild
+
+Priority: Medium (do after 2 weeks of live usage confirms setup.sh is stable)
+Effort: ~2h with Claude Code
+Goal: `make infra-up` goes from zero to live pipeline in one command
+
+### Scope (lean — no overengineering)
+
+Terraform only (hcloud provider):
+  - hcloud_server: CX22, Debian 12, Nuremberg, SSH key
+  - hcloud_firewall: UFW rules as code (22/SSH, 80/HTTP, 443/HTTPS, deny all else)
+  - hcloud_rdns: reverse DNS for the VPS IP
+  - dns_record: A record pointing domain to VPS IP
+    (use whichever DNS provider you use — Cloudflare/OVH/Gandi all
+     have Terraform providers)
+
+Terraform outputs:
+  - vps_ip (used by make register-webhook automatically)
+
+setup.sh stays as-is:
+  - Terraform provisions the metal
+  - setup.sh configures it (called via remote-exec provisioner OR
+    manually after terraform apply — remote-exec is simpler here)
+
+Secrets management:
+  - terraform.tfvars.template (never committed)
+  - All secrets still live in .env on the VPS (not in Terraform state)
+  - CRITICAL: Hcloud API token must never appear in Terraform state
+    in plaintext — use sensitive = true on all token variables
+
+New Makefile targets:
+  make infra-up     → terraform init + apply
+  make infra-down   → terraform destroy (with confirmation prompt)
+  make infra-plan   → terraform plan (dry run)
+
+### Explicit non-goals
+  - No Ansible (setup.sh is already idempotent)
+  - No Kubernetes (one VPS, one service, not worth it)
+  - No Terragrunt (single environment, no module reuse needed)
+  - No remote Terraform state (local state is fine for a personal project;
+    add Hcloud Object Storage backend only if you want it as a portfolio
+    showcase of state management)
+
+### Portfolio value
+  Add to README.md:
+  "Infrastructure provisioned with Terraform (hcloud provider).
+   One-command rebuild: make infra-up"
+  This is the line that signals DevSecOps maturity to technical reviewers.
+
