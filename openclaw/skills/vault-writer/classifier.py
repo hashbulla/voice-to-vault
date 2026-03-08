@@ -143,12 +143,14 @@ def classify_transcript(transcript: str, lang: str) -> ClassificationResult:
         system=CLASSIFIER_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_message}],
     )
-   
+
     from anthropic.types import TextBlock
 
     block = message.content[0]
     if not isinstance(block, TextBlock):
-        raise ValueError(f"Classifier returned unexpected block type: {type(block).__name__}")
+        raise ValueError(
+            f"Classifier returned unexpected block type: {type(block).__name__}"
+        )
     raw_content = block.text
     logger.debug("Classifier raw response: %s", raw_content[:300])
 
