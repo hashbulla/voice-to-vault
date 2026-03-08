@@ -6,6 +6,7 @@ Uses a real temporary git repo on disk for git operations.
 """
 
 from __future__ import annotations
+from anthropic.types import TextBlock
 
 import json
 import subprocess
@@ -157,7 +158,7 @@ def test_full_pipeline_engineering_note(env_setup, git_vault, monkeypatch):
     mock_openai_client.audio.transcriptions.create.return_value = mock_whisper_resp
 
     mock_anthropic_msg = MagicMock()
-    mock_anthropic_msg.content = [MagicMock(text=CLASSIFICATION_JSON)]
+    mock_anthropic_msg.content = [MagicMock(spec=TextBlock, text=CLASSIFICATION_JSON)]
     mock_anthropic_client = MagicMock()
     mock_anthropic_client.messages.create.return_value = mock_anthropic_msg
 
