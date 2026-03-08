@@ -1,0 +1,19 @@
+# =============================================================================
+# voice-to-vault — Crontab Example (Hetzner CX22)
+# =============================================================================
+# Install with:
+#   crontab -e
+# Then paste the line below, replacing /opt/voice-to-vault with your deploy path.
+#
+# The TZ= prefix sets the timezone for this specific cron entry only.
+# This ensures the nightly run fires at 23:00 Paris time regardless of
+# the system's default timezone (which defaults to UTC on Hetzner).
+# =============================================================================
+
+# Nightly vault processor — 23:00 CET/CEST (Europe/Paris)
+0 23 * * * TZ=Europe/Paris /opt/voice-to-vault/agents/nightly_processor/run.sh >> /var/log/voice-to-vault/cron.log 2>&1
+
+# =============================================================================
+# Optional: weekly log rotation (Sunday 01:00 UTC)
+# =============================================================================
+# 0 1 * * 0 find /var/log/voice-to-vault -name "*.log" -mtime +30 -delete

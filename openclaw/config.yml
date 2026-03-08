@@ -1,0 +1,96 @@
+## =============================================================================
+## voice-to-vault — OpenClaw Configuration
+## =============================================================================
+## Configures OpenClaw to receive Telegram voice messages and dispatch them
+## to the vault-writer skill for transcription, classification, and vaulting.
+## All ${VAR} references are resolved from the .env file at runtime.
+## =============================================================================
+
+openclaw:
+  name: voice-to-vault
+  version: "1.0.0"
+
+## ── Server ───────────────────────────────────────────────────────────────────
+server:
+  host: "0.0.0.0"
+  port: ${OPENCLAW_PORT:-8080}
+  workers: 2
+  ## Webhook path registered with Telegram via setWebhook API call
+  webhook_path: /webhook/telegram
+
+## ── Telegram integration ─────────────────────────────────────────────────────
+telegram:
+  bot_token: "${TELEGRAM_BOT_TOKEN}"
+  ## Webhook URL must be a publicly reachable HTTPS endpoint.
+  ## Point this to your Hetzner VPS public IP or domain with TLS termination.
+  ## Example: https://vault.example.com/webhook/telegram
+  webhook_url: "${OPENCLAW_WEBHOOK_URL}"
+  ## Reject updates older than 5 minutes (replay protection)
+  max_update_age: 300
+  ## Allowlist: only these Telegram numeric user IDs are processed
+  allowed_user_ids:
+    - "${TELEGRAM_ALLOWED_USER_ID}"
+
+## ── Skills registry ──────────────────────────────────────────────────────────
+skills:
+  - name: vault-writer
+    path: ./skills/vault-writer
+    entrypoint: main.py
+    enabled: true
+    ## Skill execution timeout — Whisper + Claude + git push rarely exceeds 45s
+    timeout_seconds: 90
+
+## ── Routing rules ────────────────────────────────────────────────────────────
+## Route Telegram voice messages and audio file messages to vault-writer.
+## Telegram clients may send voice recordings as either type depending on
+## device and settings.
+routing:
+  rules:
+    - match:
+        source: telegram
+        type: voice_message
+      skill: vault-writer
+
+    - match:
+        source: telegram
+        type: audio_message
+      skill: vault-writer
+
+## ── Observability ────────────────────────────────────────────────────────────
+logging:
+  level: INFO
+  format: json
+  output: stderr
+
+metrics:
+  enabled: true
+  path: /metrics
+  port: 9090
+
+health:
+  path: /health
+  port: ${OPENCLAW_PORT:-8080}
+
+## ── Security ─────────────────────────────────────────────────────────────────
+security:
+  ## Verify X-Telegram-Bot-Api-Secret-Token header on every webhook call
+  telegram_secret_token: "${OPENCLAW_WEBHOOK_SECRET}"
+  ## Rate limiting per user_id — prevents accidental flood from mobile
+  rate_limit:
+    enabled: true
+    max_requests: 20
+    window_seconds: 60
+
+## ── Retry policy ─────────────────────────────────────────────────────────────
+retry:
+  max_attempts: 3
+  backoff_seconds: 2
+  backoff_multiplier: 2.0
+  ## Retry on these HTTP status codes from downstream APIs
+  retryable_status_codes: [429, 500, 502, 503, 504]
+
+## ── Persistence ──────────────────────────────────────────────────────────────
+storage:
+  ## SQLite for event deduplication and audit trail
+  type: sqlite
+  path: /data/openclaw.db

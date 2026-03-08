@@ -1,0 +1,63 @@
+## =============================================================================
+## vault-writer — OpenClaw Skill Manifest
+## =============================================================================
+name: vault-writer
+version: "1.0.0"
+description: >
+  Transcribes Telegram voice messages via OpenAI Whisper, classifies
+  them with Claude Haiku, and writes structured markdown notes to an
+  Obsidian vault via GitHub Deploy Key push.
+
+## Skill entry point — OpenClaw calls handle(event)
+handler:
+  module: main
+  function: handle
+
+## Trigger: fire on voice messages and audio file messages
+triggers:
+  - type: telegram
+    filters:
+      - field: message.voice
+        operator: exists
+  - type: telegram
+    filters:
+      - field: message.audio
+        operator: exists
+
+## Runtime requirements
+runtime:
+  python: ">=3.11"
+  requirements_file: requirements.txt
+
+## Environment variables consumed by this skill (sourced from .env)
+env_vars:
+  required:
+    - TELEGRAM_BOT_TOKEN
+    - TELEGRAM_ALLOWED_USER_ID
+    - OPENAI_API_KEY
+    - ANTHROPIC_API_KEY
+    - VAULT_REPO
+    - VAULT_DEPLOY_KEY_PATH
+  optional:
+    - WHISPER_LANGUAGE         # default: fr
+    - WHISPER_PROMPT           # vocabulary hint for Whisper
+    - CLAUDE_MODEL             # default: claude-haiku-4-5
+    - VAULT_BRANCH             # default: main
+    - VAULT_CLONE_DIR          # default: /tmp/vault-clone
+    - MAX_AUDIO_BYTES          # default: 26214400 (25 MB)
+    - GIT_AUTHOR_NAME
+    - GIT_AUTHOR_EMAIL
+    - DEBUG
+
+## Logging
+logging:
+  level: INFO
+  format: json
+
+## Timeouts (seconds) — each step has its own budget
+timeouts:
+  telegram_download: 60
+  whisper_api: 120
+  claude_api: 30
+  git_push: 60
+  total: 90

@@ -1,0 +1,101 @@
+## =============================================================================
+## voice-to-vault — Docker Compose
+## =============================================================================
+## Runs OpenClaw and supporting services on the Hetzner CX22 VPS.
+##
+## Usage:
+##   cp .env.template .env && $EDITOR .env   # fill all values
+##   docker compose up -d
+##   docker compose logs -f openclaw
+## =============================================================================
+
+services:
+
+  ## ── OpenClaw automation engine ─────────────────────────────────────────────
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: voice-to-vault-openclaw
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"   # bind to localhost only — Caddy/nginx proxies HTTPS
+    volumes:
+      ## OpenClaw config + skills (read-only mount)
+      - ./openclaw:/app/openclaw:ro
+      ## SQLite persistence for deduplication and audit
+      - openclaw-data:/data
+      ## SSH deploy key for vault push (read-only)
+      - ${VAULT_DEPLOY_KEY_PATH}:/root/.ssh/vault_deploy_key:ro
+      ## Vault clone cache (reused across invocations for performance)
+      - vault-clone:/tmp/vault-clone
+    environment:
+      ## Telegram
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALLOWED_USER_ID: ${TELEGRAM_ALLOWED_USER_ID}
+      ## OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-fr}
+      WHISPER_PROMPT: ${WHISPER_PROMPT}
+      ## Anthropic
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-haiku-4-5}
+      ## GitHub vault repo
+      VAULT_REPO: ${VAULT_REPO}
+      VAULT_DEPLOY_KEY_PATH: /root/.ssh/vault_deploy_key
+      VAULT_BRANCH: ${VAULT_BRANCH:-main}
+      VAULT_CLONE_DIR: /tmp/vault-clone
+      ## OpenClaw
+      OPENCLAW_PORT: ${OPENCLAW_PORT:-8080}
+      OPENCLAW_WEBHOOK_SECRET: ${OPENCLAW_WEBHOOK_SECRET}
+      OPENCLAW_WEBHOOK_URL: ${OPENCLAW_WEBHOOK_URL}
+      ## Optional
+      DEBUG: ${DEBUG:-0}
+      MAX_AUDIO_BYTES: ${MAX_AUDIO_BYTES:-26214400}
+      GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-voice-to-vault[bot]}
+      GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-bot@voice-to-vault.local}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  ## ── Caddy — TLS termination and reverse proxy ──────────────────────────────
+  ## Caddy auto-provisions Let's Encrypt TLS for OPENCLAW_WEBHOOK_URL domain.
+  ## Comment this out if you handle TLS at the host level or with a CDN.
+  caddy:
+    image: caddy:2-alpine
+    container_name: voice-to-vault-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      OPENCLAW_DOMAIN: ${OPENCLAW_DOMAIN:-vault.example.com}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    depends_on:
+      openclaw:
+        condition: service_healthy
+
+volumes:
+  openclaw-data:
+    name: voice-to-vault-openclaw-data
+  vault-clone:
+    name: voice-to-vault-vault-clone
+  caddy-data:
+    name: voice-to-vault-caddy-data
+  caddy-config:
+    name: voice-to-vault-caddy-config

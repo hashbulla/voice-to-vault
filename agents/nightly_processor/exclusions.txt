@@ -1,0 +1,27 @@
+# exclusions.txt — Hardcoded forbidden write paths for nightly agent
+#
+# The nightly Claude Code agent MUST NOT write to, move files into,
+# or modify any content beneath these paths.
+# Lines beginning with '#' are comments. Blank lines are ignored.
+# Paths are relative to the vault root.
+
+# Personal life content — routing only, never content modification
+20_Areas/Life/
+
+# Immutable system infrastructure
+_System/Templates/
+
+# Archive — no new files, no modifications
+40_Archive/
+
+# Raw resources — read-only reference material
+30_Resources/
+
+# Prevent recursive agent log pollution
+_System/agent-log/
+
+# Safety: never touch git internals
+.git/
+
+# Obsidian app configuration (not tracked, but guard nonetheless)
+.obsidian/

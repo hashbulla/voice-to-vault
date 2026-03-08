@@ -1,0 +1,126 @@
+# CLAUDE.md — Obsidian Vault Context for Claude Code
+
+> **How to use this file:** Copy to your vault root as `_System/CLAUDE.md`.
+> Claude Code reads it at session start to understand vault structure, active
+> projects, and agent boundaries. Update the Active Projects table manually
+> when starting new client engagements. The agent maintains the
+> `AGENT:RECENT_CONTEXT` section automatically.
+
+---
+
+## Identity
+
+This vault belongs to **hashbulla** — a Staff AI Engineer and DevSecOps
+consultant based in Rennes, Brittany, France. The vault is an Obsidian second
+brain using the PARA method, serving as persistent context across four
+professional domains: AI automation engineering, DevSecOps/Kubernetes
+engineering, freelance deal flow management, and personal tech projects.
+
+Claude Code's role in this vault: **professional session assistant**. When
+starting a session, read this file first, then load the relevant project index,
+then confirm context with the user before producing any deliverable.
+
+Primary dictation language: **French**. All technical output, commit messages,
+and deliverables: **English**.
+
+---
+
+## Vault Schema
+
+```
+second-brain-vault/
+├── 00_Inbox/          ← Raw voice notes awaiting nightly processing
+├── 10_Projects/       ← Active client and personal projects
+│   ├── ai-automation/ ← AI automation freelance missions
+│   ├── devsecops/     ← DevSecOps/K8s consulting missions
+│   ├── freelance/     ← Deal flow, strategy, accounting
+│   └── personal-tech/ ← Personal tech exploration
+├── 20_Areas/          ← Ongoing responsibilities (no end date)
+│   ├── Engineering/   ← DevSecOps, SRE, Platform, Software Eng
+│   ├── Cyber/         ← OSINT, red team, pentest, CTF, AI security
+│   ├── Business/      ← Freelance operations, GTM, finance
+│   └── Life/          ← Personal, health, relationships, travels
+├── 30_Resources/      ← Reference material, research, libraries
+├── 40_Archive/        ← Completed/closed projects and areas
+├── _Daily/            ← Daily log files (YYYY-MM-DD.md)
+└── _System/           ← System files: this file, templates, agent logs
+    ├── CLAUDE.md      ← This file
+    ├── Meta.md        ← Vault structure reference
+    ├── agent-log/     ← Nightly agent run logs
+    └── Templates/     ← Note templates (immutable — do not edit)
+```
+
+### Agent Write Rules
+
+The nightly OpenClaw agent may:
+- Move inbox notes to `10_Projects/` or `20_Areas/`
+- Update frontmatter `status` field
+- Create/update `_Daily/<date>.md` files
+- Create `_System/agent-log/<date>-nightly.md`
+- Update the `AGENT:RECENT_CONTEXT` section of this file
+
+The nightly agent must NOT:
+- Modify transcript text or AI summaries in any note
+- Create new project folders
+- Write to `20_Areas/Life/` content (routing only)
+- Write to `_System/Templates/` or `40_Archive/` or `30_Resources/`
+
+Claude Code session assistant may:
+- Read all vault content
+- Write to `10_Projects/<domain>/<client>/` with user confirmation
+- Create project index files
+- Append to resource notes
+
+---
+
+## Active Projects
+
+| Project | Domain | Status | Last Updated |
+|---------|--------|--------|--------------|
+
+---
+
+## Domain Definitions
+
+| Domain | Scope | Example Content |
+|--------|-------|-----------------|
+| Engineering | DevSecOps, AI engineering, Kubernetes, SRE, platform engineering, software engineering, MLOps | K3s cluster design, CI/CD pipeline, Terraform modules, LangGraph agents |
+| Cyber | OSINT, red team, penetration testing, CTF, defense, AI security, threat modeling | CVE analysis, recon workflow, Kali tooling, zero-trust architecture |
+| Business | Freelance pipeline, deal flow, client management, accounting, GTM strategy | New prospect qualification, contract negotiation, invoice tracking |
+| Life | Personal development, philosophy, health, relationships, travels, history, politics | Personal reflections, book notes, travel planning |
+
+---
+
+## How to Start a Professional Session
+
+Follow this protocol every time you open a Claude Code session in this vault:
+
+1. **Read this file** (`_System/CLAUDE.md`) — understand active context.
+2. **Load project index** — read `10_Projects/<domain>/<client>/_index.md`.
+   If multiple projects are active, ask the user which one to focus on.
+3. **Scan recent notes** — list files modified in the last 7 days:
+   ```
+   find 10_Projects/<domain>/<client>/ -name "*.md" -newer _System/CLAUDE.md
+   ```
+   Or use Obsidian Dataview (if available):
+   ```dataview
+   LIST FROM "10_Projects" WHERE date >= date(today) - dur(7 days)
+   ```
+4. **Confirm context** — summarise your understanding in 2-3 sentences and
+   ask the user to confirm or correct before producing any artefact.
+5. **Begin work** — only after confirmation, proceed with the session task.
+
+**Never produce billable deliverables before completing steps 1–4.**
+
+---
+
+## Agent Boundaries
+
+The nightly processor agent (`agents/nightly_processor/AGENT_PROMPT.md`)
+runs at 23:00 CET via cron on the Hetzner VPS. It operates exclusively on
+the vault clone at `/tmp/vault-clone` and pushes changes via Deploy Key.
+
+Marker positions for agent context (maintained by agent — do not move):
+
+<!-- AGENT:RECENT_CONTEXT:START -->
+<!-- AGENT:RECENT_CONTEXT:END -->
