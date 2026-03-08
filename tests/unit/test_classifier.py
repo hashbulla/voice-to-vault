@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from anthropic.types import TextBlock
 from classifier import (
     ClassificationResult,
     _parse_classifier_response,
@@ -202,7 +203,9 @@ class TestClassifyTranscript:
     def _make_mock_client(self, mocker, response_text: str):
         mock_client = MagicMock()
         mock_message = MagicMock()
-        mock_message.content = [MagicMock(text=response_text)]
+        mock_block = MagicMock(spec=TextBlock)
+        mock_block.text = response_text
+        mock_message.content = [mock_block]
         mock_client.messages.create.return_value = mock_message
         mocker.patch("classifier.anthropic.Anthropic", return_value=mock_client)
         return mock_client
