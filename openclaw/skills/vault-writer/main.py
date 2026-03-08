@@ -280,15 +280,17 @@ def handle(event: dict) -> dict:
     # ── FIX B: Webhook secret validation ─────────────────────────────────────
     headers = event.get("headers", {})
     # Case-insensitive header lookup — Telegram sends X-Telegram-Bot-Api-Secret-Token
-    received_secret = next(
-        (
-            v
-            for k, v in headers.items()
-            if k.lower() == "x-telegram-bot-api-secret-token"
-        ),
-        "",
+    received_secret: str = str(
+        next(
+            (
+                v
+                for k, v in headers.items()
+                if k.lower() == "x-telegram-bot-api-secret-token"
+            ),
+            "",
+        )
     )
-    if not hmac.compare_digest(_WEBHOOK_SECRET, received_secret):
+    if not hmac.compare_digest(str(_WEBHOOK_SECRET or ""), str(received_secret)):
         logger.warning(
             "Webhook secret mismatch — token=%.4s…[redacted]", received_secret
         )
