@@ -221,16 +221,48 @@ chmod 644 /root/.ssh/known_hosts
 log_info "✓ GitHub added to known_hosts"
 
 ## ── Step 9: Nightly cron registration ────────────────────────────────────────
-log_info "Step 9/9: Registering nightly cron job..."
+log_info "Step 9/9: Registering scheduled cron jobs..."
 chmod +x "${DEPLOY_DIR}/agents/nightly_processor/run.sh"
 
-CRON_JOB="0 23 * * * TZ=Europe/Paris ${DEPLOY_DIR}/agents/nightly_processor/run.sh >> ${LOG_DIR}/cron.log 2>&1"
+RUN_SH="${DEPLOY_DIR}/agents/nightly_processor/run.sh"
 
-# Install cron job (idempotent)
-(crontab -l 2>/dev/null | grep -v "nightly_processor"; echo "${CRON_JOB}") | crontab -
+# Install all three cron entries (idempotent — remove old entries first, then append)
+EXISTING=$(crontab -l 2>/dev/null | grep -v "nightly_processor" || true)
+
+CRON_MORNING="0 6  * * * TZ=Europe/Paris ${RUN_SH} >> ${LOG_DIR}/cron.log 2>&1"
+CRON_AFTERNOON="0 14 * * * TZ=Europe/Paris ${RUN_SH} >> ${LOG_DIR}/cron.log 2>&1"
+CRON_NIGHTLY="0 23 * * * TZ=Europe/Paris ${RUN_SH} >> ${LOG_DIR}/cron.log 2>&1"
+
+printf '%s\n%s\n%s\n%s\n' \
+    "${EXISTING}" \
+    "${CRON_MORNING}" \
+    "${CRON_AFTERNOON}" \
+    "${CRON_NIGHTLY}" \
+    | crontab -
+
 crontab -l | grep nightly_processor
 
-log_info "✓ Cron job registered: nightly at 23:00 CET"
+log_info "✓ Cron jobs registered: 06:00, 14:00, 23:00 CET"
+
+## ── Trigger daemon setup ──────────────────────────────────────────────────────
+log_info "Setting up trigger daemon (on-demand /process trigger)..."
+
+# Create a proper venv for the trigger daemon
+python3 -m venv "${DEPLOY_DIR}/trigger_daemon/venv"
+"${DEPLOY_DIR}/trigger_daemon/venv/bin/pip" install \
+    -r "${DEPLOY_DIR}/trigger_daemon/requirements.txt" \
+    --quiet
+
+cp "${DEPLOY_DIR}/trigger_daemon/trigger.service" \
+    /etc/systemd/system/voice-to-vault-trigger.service
+systemctl daemon-reload
+systemctl enable voice-to-vault-trigger
+systemctl start voice-to-vault-trigger
+
+# Verify
+systemctl is-active voice-to-vault-trigger \
+    && log_info "✅ Trigger daemon running" \
+    || log_error "❌ FAIL: Trigger daemon not running"
 
 ## ── Security verification ─────────────────────────────────────────────────────
 echo ""

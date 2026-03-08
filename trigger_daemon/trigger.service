@@ -1,0 +1,20 @@
+[Unit]
+Description=voice-to-vault trigger daemon
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/voice-to-vault
+EnvironmentFile=/opt/voice-to-vault/.env
+ExecStart=/opt/voice-to-vault/trigger_daemon/venv/bin/uvicorn \
+  trigger_daemon.trigger_server:app \
+  --host 127.0.0.1 \
+  --port 9999 \
+  --log-level info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

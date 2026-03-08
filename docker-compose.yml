@@ -58,11 +58,16 @@ services:
       OPENCLAW_PORT: ${OPENCLAW_PORT:-8080}
       OPENCLAW_WEBHOOK_SECRET: ${OPENCLAW_WEBHOOK_SECRET}
       OPENCLAW_WEBHOOK_URL: ${OPENCLAW_WEBHOOK_URL}
+      ## Trigger daemon
+      TRIGGER_SECRET: ${TRIGGER_SECRET}
+      TRIGGER_DAEMON_URL: ${TRIGGER_DAEMON_URL:-http://host.docker.internal:9999}
       ## Optional
       DEBUG: ${DEBUG:-0}
       MAX_AUDIO_BYTES: ${MAX_AUDIO_BYTES:-26214400}
       GIT_AUTHOR_NAME: ${GIT_AUTHOR_NAME:-voice-to-vault[bot]}
       GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-bot@voice-to-vault.local}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     logging:
       driver: json-file
       options:

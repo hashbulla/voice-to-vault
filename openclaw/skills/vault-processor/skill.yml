@@ -1,0 +1,23 @@
+name: vault-processor
+version: 1.0.0
+description: >
+  Triggers an immediate vault processing run when the user sends
+  /process. Fires the nightly agent on demand via the local
+  trigger daemon. Only accepts messages from TELEGRAM_ALLOWED_USER_ID.
+handler:
+  module: main
+  function: handle_event
+triggers:
+  - type: telegram
+    filters:
+      - field: message.text
+        operator: equals
+        value: "/process"
+envvars:
+  required:
+    - TELEGRAM_BOT_TOKEN
+    - TELEGRAM_ALLOWED_USER_ID
+    - TRIGGER_SECRET
+  optional:
+    - TRIGGER_DAEMON_URL
+    # default: http://host.docker.internal:9999

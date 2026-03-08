@@ -122,3 +122,27 @@ else
 fi
 
 log "INFO: Nightly processing complete"
+
+# ── Telegram completion notification ─────────────────────────────────────────
+if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_ALLOWED_USER_ID:-}" ]; then
+    # Extract metrics from the log file (grep last occurrence of each)
+    notes_processed=$(grep -oP 'notes_processed[:=]\s*\K[0-9]+' "${LOG_FILE}" 2>/dev/null | tail -1 || echo "?")
+    notes_skipped=$(grep -oP 'notes_skipped[:=]\s*\K[0-9]+' "${LOG_FILE}" 2>/dev/null | tail -1 || echo "?")
+    notes_flagged=$(grep -oP 'notes_flagged[:=]\s*\K[0-9]+' "${LOG_FILE}" 2>/dev/null | tail -1 || echo "?")
+
+    run_ts=$(TZ=Europe/Paris date +"%Y-%m-%d %H:%M")
+
+    tg_message=$(printf '<b>✅ Vault processed — %s CET</b>\n\n📥 Notes routed:    %s\n⏭ Notes skipped:   %s\n🔍 Notes flagged:   %s\n\nNext run: tonight at 23:00 CET' \
+        "${run_ts}" "${notes_processed}" "${notes_skipped}" "${notes_flagged}")
+
+    set +e
+    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        -H "Content-Type: application/json" \
+        -d "{\"chat_id\":\"${TELEGRAM_ALLOWED_USER_ID}\",\"text\":$(printf '%s' "${tg_message}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'),\"parse_mode\":\"HTML\"}" \
+        >> "${LOG_FILE}" 2>&1 \
+        && log "INFO: Telegram completion notification sent" \
+        || log "WARN: Failed to send Telegram completion notification (non-fatal)"
+    set -e
+else
+    log "INFO: Skipping Telegram notification (TELEGRAM_BOT_TOKEN or TELEGRAM_ALLOWED_USER_ID not set)"
+fi

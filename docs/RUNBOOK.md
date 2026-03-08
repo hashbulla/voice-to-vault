@@ -255,6 +255,28 @@ Formal procedure for rotating the vault SSH Deploy Key (e.g. after suspected exp
 
 ---
 
+## Processing Schedule
+
+The vault is processed automatically three times daily:
+
+- **06:00 CET**: morning run — processes overnight voice notes
+- **14:00 CET**: afternoon run — processes morning session notes
+- **23:00 CET**: nightly run — full daily hygiene pass
+
+On-demand processing:
+
+```bash
+# Telegram: send /process to your bot
+
+# CLI (from VPS, reads TRIGGER_SECRET from .env automatically):
+make process
+
+# Direct execution:
+ssh root@<vps> bash /opt/voice-to-vault/agents/nightly_processor/run.sh
+```
+
+---
+
 ## Nightly Agent Operations
 
 ### Manual nightly run

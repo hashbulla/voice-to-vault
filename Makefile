@@ -15,7 +15,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help setup deploy start stop restart logs status test smoke-test \
         validate-env pull update-skill clean generate-deploy-key \
-        register-webhook check-webhook
+        register-webhook check-webhook process
 
 ## ── Environment ───────────────────────────────────────────────────────────────
 ENV_FILE      := .env
@@ -149,6 +149,11 @@ smoke-test: ## Run end-to-end smoke test (requires running services)
 	@echo "Verify: Check https://github.com/$$(grep VAULT_REPO $(ENV_FILE) | cut -d= -f2)/commits/main"
 
 test: smoke-test ## Alias for smoke-test
+
+process: ## Trigger an immediate vault processing run via the trigger daemon
+	@curl -s -X POST http://localhost:9999/trigger \
+		-H "X-Trigger-Secret: $(shell grep TRIGGER_SECRET .env | cut -d= -f2)" \
+		| python3 -m json.tool
 
 ## ── Skill development ─────────────────────────────────────────────────────────
 update-skill: ## Reload vault-writer skill (restart OpenClaw)
