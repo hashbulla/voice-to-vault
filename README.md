@@ -289,14 +289,29 @@ chmod +x Obsidian-*.AppImage
 2. Install Obsidian Git → configure with HTTPS + GitHub PAT
 3. Install same plugin set as desktop
 
-### 10. End-to-end smoke test
+### 10. Validate before going live
+
+Before registering the Telegram webhook, run the full test sequence documented in the [Testing](#testing) section. The short version:
 
 ```bash
-# 1. Verify OpenClaw health
+# Levels 1–2: free, ~30s — must pass before anything else
+make test-ci
+
+# Level 3: real Anthropic API calls, ~$0.02 — validates classifier and agent
+make test-eval-classifier
+make test-eval-agent
+
+# Level 4: real APIs + real git push to smoke-test branch, ~$0.02
+make test-smoke
+```
+
+Once all four levels pass, do the live end-to-end test:
+
+```bash
+# 1. Verify OpenClaw health endpoint
 make smoke-test
 
-# 2. Send a voice message to your Telegram bot from your personal account
-#    Say anything in French, e.g.:
+# 2. Send a voice message to your Telegram bot from your personal account:
 #    "Note sur le projet K3s : j'ai configuré le load balancer MetalLB
 #     ce matin, ça marche bien avec les nodes ARM."
 
@@ -307,11 +322,211 @@ make smoke-test
 #    🏷 Tags: #kubernetes #k3s #networking #load-balancing
 #    ...
 
-# 4. Verify vault commit:
+# 4. Verify vault commit appeared:
 #    https://github.com/hashbulla/second-brain-vault/commits/main
-#    Expected: commit "feat(inbox): k3s-metallb-load-balancer [openclaw]"
+#    Expected: "feat(inbox): k3s-metallb-load-balancer [openclaw]"
 
 # 5. Pull vault in Obsidian → verify note appears in 00_Inbox/
+```
+
+---
+
+## Testing
+
+The test suite has four levels with different cost and scope profiles. Run them in order — each level gates the next. Never deploy or merge a change that has not passed at minimum Levels 1 and 2.
+
+```
+Level 1 — Unit          ~2s     free     always run
+Level 2 — Integration   ~25s    free     always run
+Level 3 — Evaluation    ~2min   ~$0.02   run before first deploy and after classifier/agent changes
+Level 4 — Smoke         ~60s    ~$0.02   run before first deploy and before any production update
+```
+
+### Prerequisites
+
+Install test dependencies once, in the project root on your development machine (not the VPS):
+
+```bash
+pip install -r openclaw/skills/vault-writer/requirements.txt
+pip install -r requirements-test.txt
+```
+
+Set the minimum env var needed to import the vault-writer module during tests:
+
+```bash
+export OPENCLAW_WEBHOOK_SECRET=$(openssl rand -hex 32)
+```
+
+For Levels 3 and 4, a full `.env` with real API keys is required. Load it before running:
+
+```bash
+set -a && source .env && set +a
+```
+
+---
+
+### Before First Deploy
+
+Run every level in sequence. All must pass before the Telegram webhook goes live.
+
+**Step 1 — Unit tests (free, ~2s)**
+
+```bash
+make test-unit
+```
+
+Expected output: `154 passed`, coverage `≥ 85%`. If any test fails here, a pure logic error exists in the skill modules — fix it before proceeding.
+
+**Step 2 — Integration tests (free, ~25s)**
+
+```bash
+make test-integration
+```
+
+Expected output: `28 passed`. This exercises the full pipeline against a real temporary git repo on disk, with all network calls mocked. A failure here means a wiring problem between modules — mismatched function signatures, incorrect mock assumptions, or a broken security control.
+
+**Step 3 — Classifier evaluation (real Anthropic API, ~$0.02)**
+
+```bash
+make test-eval-classifier
+```
+
+This sends all 9 transcript fixtures to Claude Haiku with real API calls and validates:
+
+- **Hard constraints** (must be 9/9): `domain` is a valid value, `tags` is 1–5 items, `title_slug` matches `^[a-z0-9-]{3,60}$`, `summary` is non-empty, `needs_review` is boolean.
+- **Soft assertions** (pass if ≥ 80%): French engineering note → `Engineering`, business note → `Business`, etc.
+
+A hard-constraint failure means the classifier is broken and the pipeline will produce malformed vault notes. Do not deploy.
+
+The report is saved to `tests/evaluation/reports/YYYY-MM-DD-classifier.md`.
+
+**Step 4 — Agent evaluation (real Claude Code, ~2min)**
+
+```bash
+make test-eval-agent
+```
+
+This copies the `tests/evaluation/fixtures/vault_states/inbox_mixed/` vault (5 notes across 4 domains) into a temporary git repo, runs the nightly agent against it, then checks:
+
+| Assertion type | What it checks | Failure severity |
+|---|---|---|
+| Routing (9 checks) | Notes moved to correct `20_Areas/<domain>/` folder | Informational |
+| Safety (8 checks) | No files deleted, no forbidden folders created, transcripts unchanged | **Blocker — exits 1** |
+| Guardrail (1 check) | `_System/CLAUDE.md` content outside the `AGENT:RECENT_CONTEXT` markers is byte-identical | **Blocker — exits 1** |
+| Enrichment (3 checks) | Daily log written, CLAUDE.md context updated, agent log written | Informational |
+
+Any safety or guardrail failure exits with code 1. Do not deploy an agent prompt change that fails either of those.
+
+The report is saved to `tests/evaluation/reports/YYYY-MM-DD-agent.md`.
+
+**Step 5 — Smoke test (real APIs + real git push, ~$0.02)**
+
+```bash
+make test-smoke
+```
+
+This calls each pipeline component directly with real API keys and writes one commit to a dedicated `smoke-test-do-not-merge` branch on `second-brain-vault`. It does not send a real Telegram voice message.
+
+| Step | What it tests |
+|---|---|
+| 1 Whisper | Transcription of a 5-second French audio fixture |
+| 2 Haiku | Classification of the resulting transcript |
+| 3 Format | `build_note()` produces valid YAML frontmatter + body |
+| 4 Git | `write_note_and_push()` commits and pushes to the smoke branch; returns a valid 12-char hex SHA |
+| 5 Daemon | `GET /health` on the trigger daemon (skipped if `TRIGGER_DAEMON_URL` not set) |
+
+A Step 4 failure means the SSH deploy key is wrong, the branch doesn't exist, or git is misconfigured — this would cause every real voice note to fail at push time.
+
+**Step 6 — Live end-to-end test**
+
+After all five automated steps pass, send a real voice message to your Telegram bot:
+
+```
+"Note de test : j'ai validé le pipeline voice-to-vault ce matin, tout fonctionne."
+```
+
+Within 30 seconds you should receive a Telegram ACK with a domain, slug, tags, and summary. Then verify the commit appeared:
+
+```bash
+# Check the vault repo for the new commit
+git -C /tmp/vault-clone log --oneline -3
+# Expected: feat(inbox): note-de-test [openclaw]
+```
+
+If the ACK arrives but the commit is missing, the push failed silently — check `make logs` for the step 7/8 error.
+
+---
+
+### Before Any Production Update
+
+The scope of testing required depends on what changed.
+
+| Change type | Required levels |
+|---|---|
+| Vault-writer Python changes (`main.py`, `transcriber.py`, etc.) | 1, 2, 4 (smoke) |
+| `classifier.py` changes | 1, 2, 3 (eval-classifier), 4 (smoke) |
+| `AGENT_PROMPT.md` changes | 3 (eval-agent), then live test with 2-3 real notes |
+| `.env` variable changes | 4 (smoke) |
+| `trigger_server.py` changes | 1, 2 |
+| `docker-compose.yml` or `Caddyfile` changes | 4 (smoke) after redeploy |
+| No Python changes (docs, README, obsidian config) | 1 only |
+
+For any change touching the classifier or agent, also check the evaluation report from the previous run (in `tests/evaluation/reports/`) to confirm you have not regressed on domain accuracy.
+
+The fastest pre-update sequence for Python changes is:
+
+```bash
+# Takes ~30s, zero API cost
+make test-ci
+
+# Then, if classifier.py or AGENT_PROMPT.md changed:
+make test-eval-classifier
+make test-eval-agent
+```
+
+---
+
+### CI — Automated on Every Push
+
+GitHub Actions runs Levels 1 and 2 automatically on every push to `main` and every pull request. The workflow is at `.github/workflows/ci.yml`.
+
+```
+lint → unit-tests (≥85% coverage) → integration-tests
+```
+
+Levels 3 and 4 are intentionally excluded from CI — they make real API calls and must never run automatically. They are triggered manually only via `make test-eval-*` and `make test-smoke`.
+
+If CI is red, do not merge and do not deploy.
+
+---
+
+### Test Structure Reference
+
+```
+tests/
+├── conftest.py                         ← shared fixtures, env setup
+├── unit/                               ← Level 1: pure logic, zero mocks
+│   ├── test_note_formatter.py          ← build_note(), format helpers
+│   ├── test_classifier.py              ← _sanitise_slug(), JSON parsing, API mock
+│   ├── test_transcriber.py             ← Whisper API mock
+│   ├── test_git_writer.py              ← subprocess mock, git operations
+│   ├── test_telegram_ack.py            ← HTML escaping, duration formatting
+│   └── test_main.py                    ← pipeline orchestration, security controls
+├── integration/                        ← Level 2: real git on disk, all APIs mocked
+│   ├── test_pipeline_integration.py    ← full pipeline, asserts frontmatter + git commit
+│   ├── test_security.py                ← webhook secret, user allowlist, caption sanitisation
+│   └── test_trigger_daemon.py          ← FastAPI TestClient, lock file, concurrency
+├── evaluation/                         ← Level 3: real Anthropic/Claude Code calls
+│   ├── classifier_eval.py              ← 9 transcript fixtures, hard + soft assertions
+│   ├── agent_eval.py                   ← inbox_mixed vault fixture, routing + safety + guardrails
+│   ├── fixtures/
+│   │   ├── transcripts/                ← 9 realistic French voice note transcripts
+│   │   └── vault_states/
+│   │       ├── inbox_mixed/            ← 5-note vault used as agent input
+│   │       └── expected_state/         ← expected routing outcome after agent run
+│   └── reports/                        ← evaluation reports written here (gitignored)
+└── smoke/                              ← Level 4: real APIs, real git push
+    └── smoke_test.py
 ```
 
 ---
@@ -525,10 +740,12 @@ When opening a bug report, include:
 ### PR Checklist
 
 Before opening a pull request:
+- [ ] `make test-ci` passes (unit + integration, zero API cost)
 - [ ] All Python code passes `make lint`
+- [ ] If `classifier.py` changed: `make test-eval-classifier` passes all hard constraints
+- [ ] If `AGENT_PROMPT.md` changed: `make test-eval-agent` passes all safety and guardrail assertions
+- [ ] If any vault-writer module changed: `make test-smoke` Step 4 (git push) returns a valid SHA
 - [ ] New env vars are documented in `.env.template` and the Configuration Reference table
-- [ ] Skill changes are tested end-to-end (voice → vault)
-- [ ] AGENT_PROMPT.md changes are tested with a dry run (`claude --print < agents/nightly_processor/AGENT_PROMPT.md`)
 - [ ] No API keys, tokens, or secrets in any committed file
 - [ ] RUNBOOK.md updated if the change affects operations
 
